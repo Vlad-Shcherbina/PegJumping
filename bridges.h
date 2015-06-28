@@ -88,7 +88,7 @@ public:
 
 
   BridgeForest(const Graph &g, int start = SENTINEL) : g(g) {
-    for (auto kv : g) {
+    for (const auto &kv : g) {
       int v = kv.first;
       assert(v != SENTINEL);  // it is used as special value below
       pre[v] = low[v] = -1;
@@ -96,14 +96,14 @@ public:
     cnt = 0;
 
     if (start == SENTINEL) {
-      for (auto kv : g) {
+      for (const auto &kv : g) {
         int v = kv.first;
         if (pre[v] == -1) {
           dfs(SENTINEL, v);
         }
       }
       // now traverse again and collect bridge blocks
-      for (auto kv : g) {
+      for (const auto &kv : g) {
         int v = kv.first;
         if (visited.count(v) == 0) {
           roots.push_back(bridge_blocks.size());
@@ -225,8 +225,9 @@ private:
 public:
 
   ShortestPaths(const Graph &g, int start) : start(start) {
-    for (const auto &kv : g)
+    for (const auto &kv : g) {
       assert(kv.first != SENTINEL);
+    }
     queue<pair<int, int>> work;
     work.emplace(start, SENTINEL);
 
@@ -364,7 +365,53 @@ vector<int> odd_vertices(const Graph &g, int invert1=SENTINEL, int invert2=SENTI
 }
 
 
+Graph build_subgraph(const Graph &g, const set<int> &vs) {
+  Graph result;
+  for (const auto &kv : g) {
+    int v = kv.first;
+    if (vs.count(v) == 0)
+      continue;
+    for (int w : kv.second) {
+      assert(w != v);
+      if (w < v) continue;
+      if (vs.count(w) == 0)
+        continue;
+      add_edge(result, {v, w});
+      break;
+    }
+  }
+  return result;
+}
+
+
+vector<Edge> maximal_matching(const Graph &g) {
+  // TODO: this is not really maximal, just greedy.
+  vector<Edge> result;
+  set<int> used;
+  for (const auto &kv : g) {
+    int v = kv.first;
+    if (used.count(v) != 0)
+      continue;
+    for (int w : kv.second) {
+      assert(w != v);
+      if (w < v) continue;
+      if (used.count(w) != 0)
+        continue;
+
+      used.insert(v);
+      used.insert(w);
+      result.emplace_back(v, w);
+    }
+  }
+  return result;
+}
+
+
 vector<int> longest_path(const Graph &g, int from, int to);
+
+
+typedef tuple<int, int, Graph> CacheKey;
+map<CacheKey, vector<int>> cache;
 
 
 vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
@@ -375,6 +422,7 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
     else
       return {};
   }
+
   assert(BridgeForest(g).roots.size() == 1);
 
   assert(g.count(from) == 1);
@@ -389,21 +437,41 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
     return result;
   }
 
-  Graph g1 = g;
+  CacheKey cache_key(from, to, g);
+  if (cache.count(cache_key) > 0) {
+    return cache[cache_key];
+  }
 
-  sort(odd.begin(), odd.end());
-  // TODO: it's slow and bad.
+  Graph g1 = g;
   int trimmed = 0;
-  for (int i = 1; i < odd.size(); i += 2) {
-    Edge e = {odd[i - 1], odd[i]};
-    if (has_edge(g1, e)) {
-      remove_edge(g1, e);
-      trimmed++;
-      //return false;
+
+  Graph odd_subgraph = build_subgraph(g, set<int>(odd.begin(), odd.end()));
+  auto to_remove = maximal_matching(odd_subgraph);
+  int lo = 0;
+  int hi = to_remove.size() + 1;
+
+  while (hi > lo + 1) {
+    int mid = (hi + lo) / 2;
+    Graph g2 = g;
+    assert(mid <= to_remove.size());
+    for (int i = 0; i < mid; i++) {
+      remove_edge(g2, to_remove[i]);
+    }
+    if (ShortestPaths(g2, from).get_distance(to) < 0) {
+      hi = mid;
+    } else {
+      lo = mid;
+      trimmed = mid;
+      g1 = g2;
     }
   }
+
+  assert(trimmed >= 0);
+  assert(trimmed <= to_remove.size());
+  assert(ShortestPaths(g1, from).get_distance(to) >= 0);
+
   if (trimmed > 0) {
-    //cout << "trimmed " << trimmed << endl;
+    //cerr << "trimmed " << trimmed << endl;
   } else {
     assert(odd.size() >= 2);
     ShortestPaths sp(g, odd[0]);
@@ -423,13 +491,15 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
   auto result = longest_path(g1, from, to);
 
   if (!result.empty()) {
-    return result;
+    return cache[cache_key] = result;
   } else {
+    assert(trimmed == 0);  // when trimming, we guarantee it can't happen
+
     // TODO: we are returning shortest path. It's terrible.
     ShortestPaths sp(g, from);
     result = sp.get_path(to);
     assert(!result.empty());
-    return result;
+    return cache[cache_key] = result;
   }
 }
 

@@ -1,3 +1,5 @@
+#define NDEBUG
+
 #include "common.h"
 #include "bridges.h"
 
@@ -219,9 +221,6 @@ vector<Move> pick_long_path(Board &board) {
   for (int pos = 0; pos < n*n; pos++) {
     if (pos % n % 2 == 0 && pos / n % 2 == 0) {
       if (board[pos] == EMPTY) continue;
-      if (rand() % (n * n) >= 1000)
-        continue;
-      //cerr << "POS" << pos << endl;
 
       auto es = collect_edges(n, board, pos);
       //cerr << es << endl;

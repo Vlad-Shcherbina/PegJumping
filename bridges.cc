@@ -32,6 +32,19 @@ int main() {
 
   //cout << longest_path(g, 0, 4) << endl;
 
+  /*vector<int> odd = odd_vertices(g);
+  //set<int> odd_set(odd.begin(), odd.end());
+  Graph odd_subg = build_subgraph(g, set<int>(odd.begin(), odd.end()));
+  cout << graph_to_string(n, odd_subg) << endl;
+
+  cerr << maximal_matching(odd_subg) << endl;
+
+  Graph q;
+  for (auto e : maximal_matching(odd_subg)) add_edge(q, e);
+  cout << graph_to_string(n, q) << endl;
+
+  return 0;*/
+
   BridgeForest(g, 0).show(cout);
 
   auto path = longest_path_from(g, (n / 4 * 2) * (n + 1));
@@ -45,6 +58,8 @@ int main() {
     add_edge(path_graph, {path[i - 1], path[i]});
   }
   cout << graph_to_string(n, path_graph);
+
+  cout << cache.size() << endl;
 
 
   // ShortestPaths sp(bf.bridge_blocks[0], 0);
