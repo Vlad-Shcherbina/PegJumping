@@ -2,11 +2,11 @@
 #include "bridges.h"
 
 int main() {
-  int n = 60;
+  int n = 40;
   Board board;
   for (int i = 0; i < n * n; i++) {
     board.push_back(EMPTY);
-    int p = (i % n + i / n) % 2 == 1 ? 750 : 250;
+    int p = (i % n + i / n) % 2 == 1 ? 750 : 150;
     if (rand() % 1000 < p)
       board.back() = 1;
   }
@@ -34,7 +34,7 @@ int main() {
 
   BridgeForest(g, 0).show(cout);
 
-  auto path = longest_path_from(g, 0);
+  auto path = longest_path_from(g, (n / 4 * 2) * (n + 1));
 
 
   cout << path.size() << endl;

@@ -484,12 +484,14 @@ vector<int> longest_path_from(const Graph &g, int from) {
 
     const Graph &block = bf.bridge_blocks[i];
 
-    // TODO: find best paths within a block.
     best_path[i] = {bf.block_entry_point(i)};
+
+    set<int> tried_endpoints;
 
     for (int child : bf.children[i]) {
       assert(child > i);
       Edge e = bf.bridge_edges[child];
+      tried_endpoints.insert(e.first);
       vector<int> path = longest_path_in_2_edge_connected(
         block, bf.block_entry_point(i), e.first);
       extend_path(path, {e.first, e.second});
@@ -499,6 +501,22 @@ vector<int> longest_path_from(const Graph &g, int from) {
         //cout << path << best_path[i] << endl;
         assert(path.front() == best_path[i].front());
         best_path[i] = path;
+      }
+    }
+
+    // Try paths that end inside the block.
+    for (const auto &kv : block) {
+      int v = kv.first;
+      bool odd = kv.second.size() % 2 == 1;
+      if (from == v)
+        odd = !odd;
+      if (odd && tried_endpoints.count(v) == 0) {
+        vector<int> path = longest_path_in_2_edge_connected(
+            block, bf.block_entry_point(i), v);
+        if (path.size() > best_path[i].size()) {
+          assert(path.front() == best_path[i].front());
+          best_path[i] = path;
+        }
       }
     }
   }
