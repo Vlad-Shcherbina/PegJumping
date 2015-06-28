@@ -55,7 +55,9 @@ def worker(task):
 
 def main():
     subprocess.check_call(
-        'g++ --std=c++11 -Wall -Wno-sign-compare -O2 main.cc -o main',
+        #'g++ --std=c++11 -Wall -Wno-sign-compare -O2 main.cc -o main',
+        'g++ --std=c++0x -W -Wall -Wno-sign-compare '
+        '-O2 -s -pipe -mmmx -msse -msse2 -msse3 main.cc -o main',
         shell=True)
     command = './main'
 
