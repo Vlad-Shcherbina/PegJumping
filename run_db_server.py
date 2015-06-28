@@ -5,7 +5,7 @@ import flask
 import jinja2
 
 import run_db
-#import render
+import render
 
 
 web_app = flask.Flask(__name__)
@@ -47,12 +47,11 @@ def run_details():
     else:
         baseline_results = []
 
-    return 'zzz'
-    # return flask.render_template(
-    #     'run_details.html',
-    #     table=render.render_table(run.results, baseline_results),  # TODO: untangle
-    #     run=run,
-    #     debug=pprint.pformat(run.attrs))
+    return flask.render_template(
+        'run_details.html',
+        table=render.render_table(run.results, baseline_results),  # TODO: untangle
+        run=run,
+        debug=pprint.pformat(run.attrs))
 
 
 if __name__ == '__main__':

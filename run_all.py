@@ -1,3 +1,4 @@
+import ast
 import sys
 import multiprocessing
 import os
@@ -25,18 +26,24 @@ def run_solution(command, seed):
         p.wait()
         assert p.returncode == 0
 
-        score = None
-        for line in out.splitlines():
-            m = re.match(r'Score = (\d+)$', line)
-            if m is not None:
-                score = int(m.group(1))
-
-        assert score is not None, '\n' + out
-
-        return dict(
-            score=score,
+        result = dict(
             seed=str(seed),
             time=default_timer() - start)
+
+        #print('out', out)
+        #print('err', err)
+        for line in out.splitlines() + err.splitlines():
+            #print(line)
+            m = re.match(r'Score = (\d+)$', line)
+            if m is not None:
+                result['score'] = int(m.group(1))
+
+            m = re.match(r'# (\w+) = (.*)$', line)
+            if m is not None:
+                result[m.group(1)] = ast.literal_eval(m.group(2))
+
+        assert 'score' in result
+        return result
 
     except Exception as e:
         raise Exception('seed={}, out={}, err={}'.format(seed, out, err)) from e
@@ -48,11 +55,11 @@ def worker(task):
 
 def main():
     subprocess.check_call(
-        'g++ --std=c++11 main.cc -Wall -Wno-sign-compare -o main',
+        'g++ --std=c++11 -Wall -Wno-sign-compare -O2 main.cc -o main',
         shell=True)
     command = './main'
 
-    tasks = [(command, seed) for seed in range(3, 13)]
+    tasks = [(command, seed) for seed in range(1, 101)]
 
     map = multiprocessing.Pool(5).imap
 
