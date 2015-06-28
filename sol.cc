@@ -53,6 +53,8 @@ public:
   }
 
   void rec(int pos) {
+    if (path.size() > 12)  // otherwise it's too slow
+      return;
     //cerr << "rec " << pos << endl;
     path.push_back(pos);
 
@@ -294,7 +296,7 @@ public:
     }
 
     // Disabled because it's slow
-    while (false) {
+    while (true) {
       Board before = board;
       LongestPathFinder lpf(n, board);
       lpf.find();
