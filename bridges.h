@@ -350,6 +350,20 @@ vector<int> euler_path(const Graph &g, int from, int to) {
 }
 
 
+vector<int> odd_vertices(const Graph &g, int invert1=SENTINEL, int invert2=SENTINEL) {
+  vector<int> odd;
+  for (const auto &kv : g) {
+    int v = kv.first;
+    int x = kv.second.size();
+    if (v == invert1) x++;
+    if (v == invert2) x++;
+    if (x % 2 == 1)
+      odd.push_back(v);
+  }
+  return odd;
+}
+
+
 vector<int> longest_path(const Graph &g, int from, int to);
 
 
@@ -366,16 +380,7 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
   assert(g.count(from) == 1);
   assert(g.count(to) == 1);
 
-  vector<int> odd;
-  for (const auto &kv : g) {
-    int v = kv.first;
-    int x = kv.second.size();
-    if (v == from) x++;
-    if (v == to) x++;
-    if (x % 2 == 1)
-      odd.push_back(v);
-  }
-  //cout << "odd: " << odd << endl;
+  vector<int> odd = odd_vertices(g, from, to);
   assert(odd.size() % 2 == 0);
 
   if (odd.empty()) {
@@ -505,12 +510,8 @@ vector<int> longest_path_from(const Graph &g, int from) {
     }
 
     // Try paths that end inside the block.
-    for (const auto &kv : block) {
-      int v = kv.first;
-      bool odd = kv.second.size() % 2 == 1;
-      if (from == v)
-        odd = !odd;
-      if (odd && tried_endpoints.count(v) == 0) {
+    for (int v : odd_vertices(block, bf.block_entry_point(i))) {
+      if (tried_endpoints.count(v) == 0) {
         vector<int> path = longest_path_in_2_edge_connected(
             block, bf.block_entry_point(i), v);
         if (path.size() > best_path[i].size()) {
