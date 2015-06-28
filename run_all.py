@@ -59,7 +59,7 @@ def main():
         shell=True)
     command = './main'
 
-    tasks = [(command, seed) for seed in range(1, 101)]
+    tasks = [(command, seed) for seed in range(1, 201)]
 
     map = multiprocessing.Pool(5).imap
 
