@@ -258,8 +258,10 @@ public:
 
   vector<string> getMoves(vector<int> peg_values, vector<string> board_) {
     n = board_.size();
+    cerr << "# n = " << n << endl;
 
     Board board;
+    int non_empty = 0;
     for (auto row : board_) {
       assert(row.size() == n);
       for (auto c : row) {
@@ -268,9 +270,12 @@ public:
         else {
           board.push_back(peg_values.at(c - '0'));
           assert(board.back() != EMPTY);
+          non_empty++;
         }
       }
     }
+    cerr << "# density = " << 1.0 * non_empty / board.size() << endl;
+
     cerr << board_to_string(board) << endl;
 
     vector<Move> moves;
@@ -288,8 +293,8 @@ public:
       }
     }
 
-
-    while (true) {
+    // Disabled because it's slow
+    while (false) {
       Board before = board;
       LongestPathFinder lpf(n, board);
       lpf.find();
