@@ -82,7 +82,10 @@ def aggregate_stats(results):
         #         if k != 'type':
         #             stats[k].add_value(v)
         stats['log_score'].add_value(log(result['score']))
-        stats['time'].add_value(result['time'])
+        #stats['time'].add_value(result['time'])
+        for k, v in result.items():
+            if k.endswith('_time'):
+                stats[k].add_value(v)
         stats.setdefault('seeds', []).append(result['seed'])
     return stats
 
@@ -107,7 +110,7 @@ def render_cell(results, baseline_results):
     fout.write(
         '<span style="font-size:125%; font-weight:bold; color:{color}">'
         'log_score = {log_score}</span>'
-        #'<br>score = {score}'
+        '<br>score = {score}'
         .format(
         color=color,
         score=exp(stats['log_score'].mean()),
@@ -165,7 +168,7 @@ def render_table(results, baseline_results):
     fout.write('<table>')
     fout.write('<tr> <th></th>')
 
-    column_grouper = FunctionGrouper(lambda result: int((result['density'] - 0.1) * 3) / 3)
+    column_grouper = FunctionGrouper(lambda result: int((result['density'] - 0.1) * 6) / 3)
     row_grouper = FunctionGrouper(lambda result: (result['n'] - 20) // 7 * 7 + 20)
 
     for column_bucket in column_grouper.get_all_buckets(results + baseline_results):

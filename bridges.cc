@@ -1,8 +1,10 @@
+//#define NDEBUG
+
 #include "common.h"
 #include "bridges.h"
 
 int main() {
-  int n = 40;
+  int n = 60;
   Board board;
   for (int i = 0; i < n * n; i++) {
     board.push_back(EMPTY);
@@ -47,7 +49,11 @@ int main() {
 
   BridgeForest(g, 0).show(cout);
 
-  auto path = longest_path_from(g, (n / 4 * 2) * (n + 1));
+  vector<int> path;
+  {
+    TimeIt t("longest_path_time");
+    path = longest_path_from(g, (n / 4 * 2) * (n + 1));
+  }
 
 
   cout << path.size() << endl;
@@ -61,6 +67,8 @@ int main() {
 
   cout << cache.size() << endl;
 
+
+  print_timers(cout);
 
   // ShortestPaths sp(bf.bridge_blocks[0], 0);
   //cout << graph_to_string(n, bf.bridge_blocks[3]);

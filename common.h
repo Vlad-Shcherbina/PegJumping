@@ -12,11 +12,36 @@
 #include <tuple>
 #include <iterator>
 #include <queue>
+#include <time.h>
 
 #include "pretty_printing.h"
 #include "bit_powersets.h"
 
 using namespace std;
+
+
+
+map<string, clock_t> timers;
+
+class TimeIt {
+private:
+  string name;
+public:
+  TimeIt(string name) : name(name) {
+    timers[name] -= clock();
+  }
+  ~TimeIt() {
+    timers[name] += clock();
+  }
+};
+
+
+void print_timers(ostream &out) {
+  for (auto kv : timers) {
+    out << "# " << kv.first << "_time = " << 1.0 * kv.second / CLOCKS_PER_SEC << endl;
+  }
+}
+
 
 typedef int Cell;
 const Cell EMPTY = 0;

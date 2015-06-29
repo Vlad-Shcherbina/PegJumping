@@ -69,6 +69,7 @@ string graph_to_string(int n, const Graph &g) {
 }
 
 // http://stackoverflow.com/questions/11218746/bridges-in-a-connected-graph
+// with some added code to build bridge blocks
 class BridgeForest {
 private:
   const Graph &g;
@@ -88,6 +89,7 @@ public:
 
 
   BridgeForest(const Graph &g, int start = SENTINEL) : g(g) {
+    TimeIt t("bridge_forest");
     for (const auto &kv : g) {
       int v = kv.first;
       assert(v != SENTINEL);  // it is used as special value below
@@ -96,6 +98,7 @@ public:
     cnt = 0;
 
     if (start == SENTINEL) {
+      TimeIt t("bridge_forest_sentinel");
       for (const auto &kv : g) {
         int v = kv.first;
         if (pre[v] == -1) {
@@ -121,7 +124,9 @@ public:
       // It's possible that start is not in the graph.
       pre[start] = -1;
       low[start] = -1;
+      { TimeIt t("bridge_forest_dfs");
       dfs(SENTINEL, start);
+      }
 
       // now traverse again and collect bridge blocks
       int v = start;
@@ -133,7 +138,9 @@ public:
       parent_block.emplace_back(SENTINEL);
       children.emplace_back();
 
+      { TimeIt t("bridge_forest_dfs2");
       dfs2(SENTINEL, v, roots.back());
+      }
     }
   }
 
@@ -225,6 +232,7 @@ private:
 public:
 
   ShortestPaths(const Graph &g, int start) : start(start) {
+    TimeIt t("shortest_paths");
     for (const auto &kv : g) {
       assert(kv.first != SENTINEL);
     }
@@ -288,7 +296,7 @@ void extend_path(vector<int> &path, const vector<int> &extra) {
 
 
 vector<int> euler_path(const Graph &g, int from, int to) {
-  assert(BridgeForest(g).roots.size() == 1);  // connected
+  //assert(BridgeForest(g).roots.size() == 1);  // connected
 
   //cout << g << " " << from << " " << to << endl;
   //cout << graph_to_string(40, g) << endl;
@@ -423,7 +431,7 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
       return {};
   }
 
-  assert(BridgeForest(g).roots.size() == 1);
+  //assert(BridgeForest(g).roots.size() == 1);
 
   assert(g.count(from) == 1);
   assert(g.count(to) == 1);

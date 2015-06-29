@@ -258,6 +258,9 @@ public:
   int n;
 
   vector<string> getMoves(vector<int> peg_values, vector<string> board_) {
+    vector<Move> moves;
+    { TimeIt time_it("total");
+
     n = board_.size();
     cerr << "# n = " << n << endl;
 
@@ -279,7 +282,6 @@ public:
 
     cerr << board_to_string(board) << endl;
 
-    vector<Move> moves;
     //int expected_score = 0;
 
     moves = prepare_blobs(board);
@@ -313,6 +315,8 @@ public:
     }
 
     //cerr << "expected score " << expected_score << endl;
+    }
+    print_timers(cerr);
     return moves_to_strings(n, moves);
   }
 
