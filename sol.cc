@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "bridges.h"
+#include "patch.h"
 
 
 class LongestPathFinder {
@@ -286,6 +287,11 @@ public:
 
     moves = prepare_blobs(board);
 
+    for (auto move : divide_and_optimize(board, 8)) {
+      moves.push_back(move);
+      move.apply(board);
+    }
+
     while (true) {
       auto path = pick_long_path(board);
       if (path.size() < 10)
@@ -296,21 +302,23 @@ public:
       }
     }
 
-    // Disabled because it's slow
-    while (true) {
-      Board before = board;
-      LongestPathFinder lpf(n, board);
-      lpf.find();
-      if (lpf.best_score <= 0) break;
-      //expected_score += lpf.best_score;
-      cerr << "best " << lpf.best_score << lpf.best_path << endl;
-      vector<Move> extra_moves = lpf.get_moves();
+    {
+      TimeIt t("greedy_brute");
+      while (true) {
+        Board before = board;
+        LongestPathFinder lpf(n, board);
+        lpf.find();
+        if (lpf.best_score <= 0) break;
+        //expected_score += lpf.best_score;
+        cerr << "best " << lpf.best_score << lpf.best_path << endl;
+        vector<Move> extra_moves = lpf.get_moves();
 
-      assert(before == board);
+        assert(before == board);
 
-      for (Move move : extra_moves) {
-        moves.push_back(move);
-        move.apply(board);
+        for (Move move : extra_moves) {
+          moves.push_back(move);
+          move.apply(board);
+        }
       }
     }
 
