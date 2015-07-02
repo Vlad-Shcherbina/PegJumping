@@ -15,7 +15,7 @@ vector<Edge> collect_edges(int n, const Board &board, int pos) {
 }
 
 
-typedef map<int, vector<int>> Graph;
+typedef unordered_map<int, vector<int>> Graph;
 
 const int SENTINEL = -42;
 
@@ -66,6 +66,22 @@ string graph_to_string(int n, const Graph &g) {
   Board board(n*n);
   draw_graph(board, g);
   return show_edges(board, 0, 0);
+}
+
+uint64_t compute_graph_hash(const Graph &g) {
+  vector<Edge> edges;
+  for (const auto &kv : g) {
+    for (int w : kv.second)
+      edges.emplace_back(kv.first, w);
+  }
+  sort(edges.begin(), edges.end());
+  uint64_t result = 0;
+  for (const auto &e : edges) {
+    result *= 19;
+    result ^= result >> 50;
+    result += e.first + 119 * e.second + (e.first + e.second) / 3;
+  }
+  return result;
 }
 
 // http://stackoverflow.com/questions/11218746/bridges-in-a-connected-graph
@@ -295,6 +311,26 @@ void extend_path(vector<int> &path, const vector<int> &extra) {
 }
 
 
+bool is_path_in_graph(const Graph &g, int from, int to, const vector<int> &path) {
+  assert(path.size() > 0);
+
+  if (path.front() != from || path.back() != to)
+    return false;
+
+  set<Edge> edges;
+  for (int i = 1; i < path.size(); i++) {
+    Edge e(path[i - 1], path[i]);
+    if (edges.count(e) > 0)
+      return false;
+    if (!has_edge(g, e))
+      return false;
+    edges.insert(e);
+  }
+
+  return true;
+}
+
+
 vector<int> euler_path(const Graph &g, int from, int to) {
   //assert(BridgeForest(g).roots.size() == 1);  // connected
 
@@ -415,11 +451,30 @@ vector<Edge> maximal_matching(const Graph &g) {
 }
 
 
-vector<int> longest_path(const Graph &g, int from, int to);
+int upper_bound_on_longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
+  auto odd = odd_vertices(g, from, to);
+  assert(odd.size() % 2 == 0);
+  int num_edges = 0;
+  for (const auto &kv : g) {
+    num_edges += kv.second.size();
+  }
+  assert(num_edges % 2 == 0);
+  num_edges /= 2;
+  assert(num_edges >= odd.size() / 2);
+
+  return num_edges - odd.size() / 2;
+}
 
 
-typedef tuple<int, int, Graph> CacheKey;
+#define LP_CACHE
+
+#ifdef LP_CACHE
+typedef tuple<int, int, uint64_t> CacheKey;
 map<CacheKey, vector<int>> cache;
+#endif
+
+
+vector<int> longest_path(const Graph &g, int from, int to);
 
 
 vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
@@ -445,10 +500,17 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
     return result;
   }
 
-  CacheKey cache_key(from, to, g);
+  // TODO: exploit symmetry: (from, to) is the same as (to, from).
+
+  #ifdef LP_CACHE
+  CacheKey cache_key(from, to, compute_graph_hash(g));
   if (cache.count(cache_key) > 0) {
-    return cache[cache_key];
+    if (is_path_in_graph(g, from, to, cache[cache_key]))
+      return cache[cache_key];
+    else
+      cerr << "collision" << endl;
   }
+  #endif
 
   Graph g1 = g;
   int trimmed = 0;
@@ -499,7 +561,6 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
   auto result = longest_path(g1, from, to);
 
   if (!result.empty()) {
-    return cache[cache_key] = result;
   } else {
     assert(trimmed == 0);  // when trimming, we guarantee it can't happen
 
@@ -507,8 +568,23 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
     ShortestPaths sp(g, from);
     result = sp.get_path(to);
     assert(!result.empty());
-    return cache[cache_key] = result;
   }
+
+  int ub = upper_bound_on_longest_path_in_2_edge_connected(g, from, to);
+  //cerr << (result.size() - 1) << "/" << ub << endl;
+  if (ub < result.size() - 1) {
+    cerr << g << endl;
+    cerr << from << " ... " << to << endl;
+    cerr << ub << endl;
+    cerr << result << endl;
+    assert(false);
+  }
+
+  #ifdef LP_CACHE
+  return cache[cache_key] = result;
+  #else
+  return result;
+  #endif
 }
 
 
@@ -552,7 +628,14 @@ vector<int> longest_path_in_bridge_forest(const BridgeForest &bf, int from, int 
 
 vector<int> longest_path(const Graph &g, int from, int to) {
   BridgeForest bf(g, from);
-  return longest_path_in_bridge_forest(bf, from, to);
+  vector<int> result = longest_path_in_bridge_forest(bf, from, to);
+  if (!result.empty()) {
+    // cerr << g << endl;
+    // cerr << from << " ... "<< to << endl;
+    // cerr << result << endl;
+    assert(is_path_in_graph(g, from, to, result));
+  }
+  return result;
 }
 
 
@@ -571,10 +654,23 @@ vector<int> longest_path_from(const Graph &g, int from) {
 
     set<int> tried_endpoints;
 
-    for (int child : bf.children[i]) {
+    vector<int> children = bf.children[i];
+    sort(children.begin(), children.end(), [&best_path](int c1, int c2){
+      return best_path[c1].size() > best_path[c2].size();
+    });
+
+    for (int child : children) {
       assert(child > i);
       Edge e = bf.bridge_edges[child];
       tried_endpoints.insert(e.first);
+
+      int ub = upper_bound_on_longest_path_in_2_edge_connected(block, bf.block_entry_point(i), e.first);
+      if (ub + 1 + best_path[child].size() <= best_path[i].size()) {
+        cerr << "ub cut " << block.size() << block << endl;
+        cerr << "by " << (best_path[i].size() - (ub + 1 + best_path[child].size())) << endl;
+        continue;
+      }
+
       vector<int> path = longest_path_in_2_edge_connected(
         block, bf.block_entry_point(i), e.first);
       extend_path(path, {e.first, e.second});
@@ -600,5 +696,6 @@ vector<int> longest_path_from(const Graph &g, int from) {
     }
   }
 
+  assert(is_path_in_graph(g, from, best_path[0].back(), best_path[0]));
   return best_path[0];
 }

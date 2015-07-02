@@ -4,6 +4,7 @@
 #include <ostream>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <utility>
 #include <tuple>
@@ -39,6 +40,20 @@ std::ostream& operator<<(std::ostream &out, const std::set<T> &s) {
 
 template<typename K, typename V>
 std::ostream& operator<<(std::ostream &out, const std::map<K, V> &m) {
+  out << "{";
+  bool first = true;
+  for (const auto &kv : m) {
+    if (!first)
+      out << ", ";
+    first = false;
+    out << kv.first << ": " << kv.second;
+  }
+  out << "}";
+  return out;
+}
+
+template<typename K, typename V>
+std::ostream& operator<<(std::ostream &out, const std::unordered_map<K, V> &m) {
   out << "{";
   bool first = true;
   for (const auto &kv : m) {

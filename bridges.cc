@@ -1,4 +1,4 @@
-//#define NDEBUG
+#define NDEBUG
 
 #include "common.h"
 #include "bridges.h"
@@ -51,7 +51,7 @@ int main() {
 
   vector<int> path;
   {
-    TimeIt t("longest_path_time");
+    TimeIt t("total");
     path = longest_path_from(g, (n / 4 * 2) * (n + 1));
   }
 
@@ -64,8 +64,11 @@ int main() {
     add_edge(path_graph, {path[i - 1], path[i]});
   }
   cout << graph_to_string(n, path_graph);
+  cout << path.size() << endl;
 
-  cout << cache.size() << endl;
+  #ifdef LP_CACHE
+  cout << cache.size() << " cached items" << endl;
+  #endif
 
 
   print_timers(cout);

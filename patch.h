@@ -185,7 +185,7 @@ vector<Move> divide_and_optimize(Board board, int tile_size) {
   vector<Patcher> patchers;
   vector<Move> moves;
 
-  for (int i = 0; i + tile_size <= n; i += tile_size + 2)  // +2 is a hack to ensure X
+  for (int i = 0; i + tile_size <= n; i += tile_size)  // +2 is a hack to ensure X
     for (int j = 0; j + tile_size <= n; j += tile_size) {
       patchers.emplace_back(board, i, j, tile_size);
       cerr << "tile at " << i << ", " << j << " of size " << tile_size << endl;

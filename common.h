@@ -13,6 +13,7 @@
 #include <iterator>
 #include <queue>
 #include <time.h>
+#include <unordered_map>
 
 #include "pretty_printing.h"
 #include "bit_powersets.h"
