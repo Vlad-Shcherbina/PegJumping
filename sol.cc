@@ -1,7 +1,7 @@
-#define NDEBUG
+//#define NDEBUG
 
+#include <unistd.h>
 #include "common.h"
-
 
 
 // Return pairs (pos, length)
@@ -67,6 +67,12 @@ public:
 
     }  // TimeIt
     print_timers(cerr);
+
+    #ifndef SUBMISSION
+    // Just in case, because there were some mysterious problems.
+    cerr.flush();
+    usleep(200000);
+    #endif
 
     return moves_to_strings(n, moves);
   }

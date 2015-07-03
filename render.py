@@ -81,12 +81,13 @@ def aggregate_stats(results):
         #     for k, v in dp.items():
         #         if k != 'type':
         #             stats[k].add_value(v)
-        stats['log_score'].add_value(log(result['score']))
-        #stats['time'].add_value(result['time'])
-        for k, v in result.items():
-            if k.endswith('_time'):
-                stats[k].add_value(v)
+        stats['log_score'].add_value(
+            log(result['score']) if result['score'] else -100)
         stats.setdefault('seeds', []).append(result['seed'])
+        for k, v in result.items():
+            if k in ('score', 'seed', 'time'):
+                continue
+            stats[k].add_value(v)
     return stats
 
 
