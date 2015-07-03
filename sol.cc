@@ -1,8 +1,78 @@
-//#define NDEBUG
+#define NDEBUG
 
 #include <unistd.h>
 #include "common.h"
 #include "sparsify.h"
+#include "bridges.h"
+
+
+vector<Move> pick_long_path(const Board &board, int i_parity, int j_parity) {
+  int n = board_size(board);
+  Graph graph;
+  for (int pos = 0; pos < n * n; pos++) {
+    if (pos % n % 2 == j_parity && pos / n % 2 == i_parity) {
+      if (board[pos] == EMPTY) {
+        for (auto e : collect_edges(n, board, pos)) {
+          add_edge(graph, e);
+        }
+      }
+    }
+  }
+
+  vector<int> best;
+  int best_score = -1;
+
+  for (int pos = 0; pos < n*n; pos++) {
+    if (pos % n % 2 == j_parity && pos / n % 2 == i_parity) {
+      // if (rand() % 13 == 0)
+      //   cerr << 100 * pos / (n * n) << "%" << endl;
+
+      if (board[pos] == EMPTY) continue;
+
+      auto es = collect_edges(n, board, pos);
+      if (!es.empty()) {
+        Graph g = graph;
+        for (auto e : es)
+          add_edge(g, e);
+
+        vector<int> path = longest_path_from(g, pos);
+        int score = path_score(board, path);
+        if (score > best_score) {
+          best = path;
+          best_score = score;
+        }
+      }
+    }
+  }
+  //cerr << best << endl;
+  if (best.empty())
+    return {};
+
+  vector<Move> result;
+  for (int i = 1; i < best.size(); i++)
+    result.emplace_back(best[i - 1], (best[i] - best[i - 1]) / 2);
+  return result;
+}
+
+
+vector<Move> pick_long_path(const Board &board) {
+  vector<Move> best_path;
+  int best_score = -1;
+  for (int i_parity = 0; i_parity < 2; i_parity++)
+    for (int j_parity = 0; j_parity < 2; j_parity++) {
+      auto path = pick_long_path(board, i_parity, j_parity);
+      int score = path_score(board, path);
+      //cerr << "score " << score << endl;
+      if (score > best_score) {
+        if (best_score > 5000)
+          cerr << "# improvement = " << 1.0 * score / best_score << endl;
+        best_score = score;
+        best_path = path;
+      }
+    }
+  return best_path;
+}
+
 
 class PegJumping {
 public:
@@ -59,6 +129,7 @@ public:
     int preferred_parity = 0;
     if (n % 2 == 0 and odd_pegs*odd_value > even_pegs*even_value)
       preferred_parity = 1;
+    preferred_parity = 0;
 
     cerr << "# preferred_parity = " << preferred_parity << endl;
 
@@ -81,8 +152,37 @@ public:
 
     cerr << show_edges(board, 0, preferred_parity) << endl;
 
+    vector<int> path_scores;
+    int i = 0;
+    while (true) {
+      auto long_path = pick_long_path(board);
+      if (long_path.empty()) break;
+      //cerr << "# long_path = " << long_path.size() << endl;
+      int score = path_score(board, long_path);
+      path_scores.push_back(score);
+
+      for (auto move : long_path) {
+        final_moves.push_back(move);
+        move.apply(board);
+      }
+      i++;
+    }
+
+    cerr << path_scores << endl;
+    if (path_scores.size() >= 2) {
+      cerr << "# score_ratio = " << 1.0 * path_scores[1] / path_scores[0] << endl;
+    }
+
+    //cerr << "# long_path_ratio = " << 1.0 * long_path2.size() / long_path.size() << endl;
+
+    //cerr << show_edges(board, 0, preferred_parity) << endl;
+
     }  // TimeIt
     print_timers(cerr);
+
+    #ifdef LP_CACHE
+    cerr << "# lp_cache_size = " << cache.size() << endl;
+    #endif
 
     #ifndef SUBMISSION
     // Just in case, because there were some mysterious problems.

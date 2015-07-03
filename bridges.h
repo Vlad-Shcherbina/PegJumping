@@ -500,9 +500,14 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
     return result;
   }
 
-  // TODO: exploit symmetry: (from, to) is the same as (to, from).
-
   #ifdef LP_CACHE
+  // TODO: Symmetry exploitation it does not seem to help. Investigate.
+  // if (to < from) {
+  //   auto result = longest_path_in_2_edge_connected(g, to, from);
+  //   reverse(result.begin(), result.end());
+  //   return result;
+  // }
+
   CacheKey cache_key(from, to, compute_graph_hash(g));
   if (cache.count(cache_key) > 0) {
     if (is_path_in_graph(g, from, to, cache[cache_key]))

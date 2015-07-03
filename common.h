@@ -153,7 +153,7 @@ vector<int> get_deltas(int n, int index) {
 }
 
 
-string show_edges(const Board &board, int x0, int y0) {
+string show_edges(const Board &board, int y0, int x0) {
   ostringstream out;
 
   int n = board_size(board);
@@ -267,6 +267,31 @@ vector<Move> transpose_moves(int n, const vector<Move> &moves) {
   return result;
 }
 
+
+int path_score(const Board &board, const vector<Move> &moves) {
+  for (int i = 1; i < moves.size(); i++) {
+    assert(moves[i - 1].start + 2 * moves[i - 1].delta == moves[i].start);
+  }
+  int sum = 0;
+  for (const auto &move : moves) {
+    Cell c = board[move.start + move.delta];
+    assert(c != EMPTY);
+    sum += c;
+  }
+  return moves.size() * sum;
+}
+
+
+int path_score(const Board &board, const vector<int> &path) {
+  int sum = 0;
+  assert(path.size() > 0);
+  for (int i = 1; i < path.size(); i++) {
+    Cell c = board[(path[i - 1] + path[i]) / 2];
+    assert(c != EMPTY);
+    sum += c;
+  }
+  return (path.size() - 1) * sum;
+}
 
 
 #endif
