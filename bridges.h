@@ -666,8 +666,8 @@ vector<int> longest_path_from(const Graph &g, int from) {
 
       int ub = upper_bound_on_longest_path_in_2_edge_connected(block, bf.block_entry_point(i), e.first);
       if (ub + 1 + best_path[child].size() <= best_path[i].size()) {
-        cerr << "ub cut " << block.size() << block << endl;
-        cerr << "by " << (best_path[i].size() - (ub + 1 + best_path[child].size())) << endl;
+        // cerr << "ub cut " << block.size() << block << endl;
+        // cerr << "by " << (best_path[i].size() - (ub + 1 + best_path[child].size())) << endl;
         continue;
       }
 

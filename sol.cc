@@ -292,6 +292,7 @@ public:
       move.apply(board);
     }
 
+    bool first = true;
     while (true) {
       auto path = pick_long_path(board);
       if (path.size() < 10)
@@ -299,6 +300,17 @@ public:
       for (auto move : path) {
         moves.push_back(move);
         move.apply(board);
+      }
+
+      if (first) {
+        first = false;
+        Graph g;
+        for (auto move : path)
+          add_edge(g, {move.start, move.start + 2*move.delta});
+        cerr << "longest path: " << path.size() << endl;
+        cerr << graph_to_string(n, g) << endl;
+        cerr << "remaining board: " << endl;
+        cerr << show_edges(board, 0, 0) << endl;
       }
     }
 
@@ -324,6 +336,12 @@ public:
 
     //cerr << "expected score " << expected_score << endl;
     }
+
+
+    #ifdef LP_CACHE
+    cerr << "# lp_cache_size = " << cache.size() << endl;
+    #endif
+
     print_timers(cerr);
     return moves_to_strings(n, moves);
   }

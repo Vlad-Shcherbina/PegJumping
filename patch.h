@@ -1,11 +1,3 @@
-bool moves_commute(int pos1, int delta1, int pos2, int delta2) {
-  vector<int> all = {
-      pos1, pos1 + delta1, pos1 + 2*delta1,
-      pos2, pos2 + delta2, pos2 + 2*delta2};
-  sort(all.begin(), all.end());
-  return unique(all.begin(), all.end()) == all.end();
-}
-
 
 class PatchOptimizer {
 public:
