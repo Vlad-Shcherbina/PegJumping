@@ -60,7 +60,7 @@ struct Move {
   Move(int start, int delta)
     : start(start), delta(delta), middle(EMPTY) {}
 
-  void apply(Board &board) {
+  void apply(Board &board) const {
     // board[start + 2 * delta] = board[start];
     // board[start] = EMPTY;
     // board[start + delta] = middle;
@@ -75,6 +75,13 @@ struct Move {
     board.at(start + 2 * delta) = board.at(start);
     board.at(start) = EMPTY;
     board.at(start + delta) = middle;
+  }
+
+  Move transpose(int n) const {
+    int mid = start + delta;
+    int new_start = start % n * n + start / n;
+    int new_mid = mid % n * n + mid / n;
+    return Move(new_start, new_mid - new_start);
   }
 };
 
@@ -217,6 +224,49 @@ bool moves_commute(int pos1, int delta1, int pos2, int delta2) {
   sort(all.begin(), all.end());
   return unique(all.begin(), all.end()) == all.end();
 }
+
+
+bool moves_commute(const Move &move1, const Move &move2) {
+  return moves_commute(move1.start, move1.delta, move2.start, move2.delta);
+}
+
+
+vector<Move> moves_in_a_box(int n, int i1, int j1, int i2, int j2) {
+  vector<Move> result;
+  for (int i = i1; i < i2; i++) {
+    for (int j = j1; j < j2; j++) {
+      int pos = i * n + j;
+      if (j + 2 < j2) {
+        result.emplace_back(pos, 1);
+        result.emplace_back(pos + 2, -1);
+      }
+      if (i + 2 < i2) {
+        result.emplace_back(pos, n);
+        result.emplace_back(pos + 2*n, -n);
+      }
+    }
+  }
+  return result;
+}
+
+
+Board transpose_board(const Board &board) {
+  int n = board_size(board);
+  Board result(n * n);
+  for (int i = 0; i < n; i++)
+    for (int j = 0; j < n; j++)
+      result[i * n + j] = board[j * n + i];
+  return result;
+}
+
+
+vector<Move> transpose_moves(int n, const vector<Move> &moves) {
+  vector<Move> result;
+  for (const auto &move : moves)
+    result.push_back(move.transpose(n));
+  return result;
+}
+
 
 
 #endif
