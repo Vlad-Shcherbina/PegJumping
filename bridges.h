@@ -52,6 +52,15 @@ bool has_edge(const Graph &g, const Edge &e) {
 }
 
 
+int num_edges(const Graph &g) {
+  int result = 0;
+  for (const auto &kv : g)
+    result += kv.second.size();
+  assert(result % 2 == 0);
+  return result / 2;
+}
+
+
 void draw_graph(Board &board, const Graph &g) {
   for (const auto &kv : g) {
     int v = kv.first;
@@ -66,6 +75,14 @@ string graph_to_string(int n, const Graph &g) {
   Board board(n*n);
   draw_graph(board, g);
   return show_edges(board, 0, 0);
+}
+
+string path_to_string(int n, const vector<int> &path) {
+  assert(!path.empty());
+  Graph g;
+  for (int i = 1; i < path.size(); i++)
+    add_edge(g, {path[i - 1], path[i]});
+  return graph_to_string(n, g);
 }
 
 uint64_t compute_graph_hash(const Graph &g) {
@@ -223,13 +240,8 @@ private:
 
   void show_tree(ostream& out, string indent, int index) const {
     int num_vertices = bridge_blocks[index].size();
-    int num_edges = 0;
-    for (const auto &kv : bridge_blocks[index])
-      num_edges += kv.second.size();
-    assert(num_edges % 2 == 0);
-    num_edges /= 2;
     out << "block " << index
-        << " of size " << make_pair(num_vertices, num_edges)
+        << " of size " << make_pair(num_vertices, num_edges(bridge_blocks[index]))
         << endl;
     for (int child : children[index]) {
       out << indent << bridge_edges[child] << ": ";
@@ -241,11 +253,10 @@ private:
 
 
 class ShortestPaths {
-private:
+public:
   map<int, int> parent;
   map<int, int> distance;
   int start;
-public:
 
   ShortestPaths(const Graph &g, int start) : start(start) {
     TimeIt t("shortest_paths");
@@ -451,18 +462,89 @@ vector<Edge> maximal_matching(const Graph &g) {
 }
 
 
+vector<int> expand_path(Graph graph, vector<int> path) {
+  assert(!path.empty());
+
+  map<int, int> index_in_path;
+  for (int i = 0; i < path.size(); i++) {
+    index_in_path[path[i]] = i;
+  }
+
+  for (int i = 1; i < path.size(); i++)
+    remove_edge(graph, {path[i - 1], path[i]});
+
+  for (const auto &kv : index_in_path) {
+    int start = kv.first;
+    // TODO: distringuish minimum and maximum index
+    int start_index = kv.second;
+
+    auto p = graph.find(start);
+    if (p == graph.end())
+      continue;
+
+    for (int w : p->second) {
+      // cerr << "Considering departure " << start << " -> " << w << endl;
+
+      remove_edge(graph, {start, w});
+
+      ShortestPaths sp(graph, w);
+      for (const auto &kv2 : index_in_path) {
+        int candidate_end = kv2.first;
+        int end_index = kv2.second;
+        int d = sp.get_distance(candidate_end);
+        if (d != -1 && d + 1 > abs(end_index - start_index)) {
+          vector<int> new_slice = sp.get_path(candidate_end);
+
+          // cerr << "Improvement found: " << new_slice << endl;
+
+          if (start_index <= end_index) {
+            slice_assign(path, start_index + 1, end_index + 1, new_slice);
+          } else {
+            reverse(new_slice.begin(), new_slice.end());
+            slice_assign(path, end_index, start_index, new_slice);
+          }
+
+          return path;
+        }
+      }
+
+      add_edge(graph, {start, w});
+    }
+  }
+
+  //cerr << graph_to_string(10, graph) << endl;
+
+  return path;
+}
+
+
+vector<int> longest_path_by_expansion_raw(const Graph &g, int from, int to) {
+  TimeIt t("longest_path_by_expansion_raw");
+  auto path = ShortestPaths(g, from).get_path(to);
+
+  // TODO: support randomized changes even if new slice has the same length
+  // as the old one.
+  while (true) {
+    //cerr << path.size() << endl;
+    auto new_path = expand_path(g, path);
+    if (path == new_path) break;
+    path = new_path;
+
+    if (check_deadline())
+      break;
+  }
+  assert(is_path_in_graph(g, from, to, path));
+  return path;
+}
+
+
 int upper_bound_on_longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
   auto odd = odd_vertices(g, from, to);
   assert(odd.size() % 2 == 0);
-  int num_edges = 0;
-  for (const auto &kv : g) {
-    num_edges += kv.second.size();
-  }
-  assert(num_edges % 2 == 0);
-  num_edges /= 2;
-  assert(num_edges >= odd.size() / 2);
 
-  return num_edges - odd.size() / 2;
+  int ne = num_edges(g);
+  assert(ne >= odd.size() / 2);
+  return ne - odd.size() / 2;
 }
 
 
@@ -516,6 +598,16 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
       cerr << "collision" << endl;
   }
   #endif
+
+  auto result = longest_path_by_expansion_raw(g, from, to);
+
+  #ifdef LP_CACHE
+  return cache[cache_key] = result;
+  #else
+  return result;
+  #endif
+
+  /*
 
   Graph g1 = g;
   int trimmed = 0;
@@ -590,6 +682,7 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
   #else
   return result;
   #endif
+  */
 }
 
 
@@ -688,9 +781,12 @@ vector<int> longest_path_from(const Graph &g, int from) {
       }
     }
 
+    int limit = 2;
     // Try paths that end inside the block.
     for (int v : odd_vertices(block, bf.block_entry_point(i))) {
       if (tried_endpoints.count(v) == 0) {
+        if (--limit == 0) break;
+
         vector<int> path = longest_path_in_2_edge_connected(
             block, bf.block_entry_point(i), v);
         if (path.size() > best_path[i].size()) {

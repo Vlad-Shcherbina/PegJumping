@@ -294,4 +294,42 @@ int path_score(const Board &board, const vector<int> &path) {
 }
 
 
+template<typename T>
+void slice_assign(vector<T> &xs, int start, int end, const vector<T> &new_slice) {
+  //cerr << xs << "[" << start << ":" << end << "] = " << new_slice << " ..." << endl;
+  assert(0 <= start);
+  assert(start <= end);
+  assert(end <= xs.size());
+
+  if (new_slice.size() <= end - start) {
+    xs.erase(xs.begin() + start + new_slice.size(), xs.begin() + end);
+    copy(new_slice.begin(), new_slice.end(), xs.begin() + start);
+  } else if (new_slice.size() > end - start) {
+    copy(new_slice.begin(), new_slice.begin() + end - start, xs.begin() + start);
+    xs.insert(xs.begin() + end, new_slice.begin() + end - start, new_slice.end());
+  }
+  //cerr << "... results in " << xs << endl;
+}
+
+
+vector<clock_t> deadlines;
+
+void add_subdeadline(float fraction) {
+  assert(!deadlines.empty());
+  auto now = clock();
+  auto remaining = deadlines.back() - now;
+  if (remaining < 0) {
+    cerr << "# DEADLINE_MISSED = " << remaining << endl;
+    deadlines.push_back(deadlines.back());
+  }
+
+  deadlines.push_back(now + remaining * fraction);
+}
+
+
+bool check_deadline() {
+  return !deadlines.empty() and clock() > deadlines.back();
+}
+
+
 #endif

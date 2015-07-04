@@ -6,6 +6,9 @@
 #include "bridges.h"
 
 
+const float TIME_LIMIT = 9.0;
+
+
 vector<Move> pick_long_path(const Board &board, int i_parity, int j_parity) {
   int n = board_size(board);
   Graph graph;
@@ -22,8 +25,16 @@ vector<Move> pick_long_path(const Board &board, int i_parity, int j_parity) {
   vector<int> best;
   int best_score = -1;
 
-  for (int pos = 0; pos < n*n; pos++) {
+  vector<int> poss(n*n);
+  iota(poss.begin(), poss.end(), 0);
+  shuffle(poss.begin(), poss.end(), std::default_random_engine(42));
+
+  for (int pos : poss) {
     if (pos % n % 2 == j_parity && pos / n % 2 == i_parity) {
+      if (best_score > 0 && clock() > deadlines.back()) {
+        cerr << "shit" << endl;
+        break;
+      }
       // if (rand() % 13 == 0)
       //   cerr << 100 * pos / (n * n) << "%" << endl;
 
@@ -79,6 +90,7 @@ public:
   int n;
 
   vector<string> getMoves(vector<int> peg_values, vector<string> board_) {
+    deadlines.push_back(clock() + TIME_LIMIT * CLOCKS_PER_SEC);
     srand(42);
     vector<Move> final_moves;
     { TimeIt time_it("total");
@@ -155,7 +167,10 @@ public:
     vector<int> path_scores;
     int i = 0;
     while (true) {
+      add_subdeadline(0.9);
       auto long_path = pick_long_path(board);
+      deadlines.pop_back();
+
       if (long_path.empty()) break;
       //cerr << "# long_path = " << long_path.size() << endl;
       int score = path_score(board, long_path);
@@ -179,6 +194,8 @@ public:
 
     }  // TimeIt
     print_timers(cerr);
+
+    assert(deadlines.size() == 1);
 
     #ifdef LP_CACHE
     cerr << "# lp_cache_size = " << cache.size() << endl;
