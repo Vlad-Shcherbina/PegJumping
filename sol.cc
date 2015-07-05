@@ -144,10 +144,10 @@ public:
     cerr << "even value: " << even_pegs*even_value << endl;
     cerr << "odd value: " << odd_pegs*odd_value << endl;
 
+    // TODO: I suspect it actually reduces score by 5%. Investigate.
     int preferred_parity = 0;
     if (n % 2 == 0 and odd_pegs*odd_value > even_pegs*even_value)
       preferred_parity = 1;
-    preferred_parity = 0;
 
     cerr << "# preferred_parity = " << preferred_parity << endl;
 

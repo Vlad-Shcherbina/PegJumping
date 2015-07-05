@@ -208,6 +208,6 @@ vector<Move> divide_and_optimize(Board board, int tile_size, int preferred_parit
 
   cerr << "whole board after: " << endl;
   for (auto move : moves) move.apply(board);
-  cerr << show_edges(board, 0, 0) << endl;
+  cerr << show_edges(board, preferred_parity, 0) << endl;
   return moves;
 }
