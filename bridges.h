@@ -554,19 +554,28 @@ void build_frontier(Frontier &f) {
 
 class Expander {
 public:
-  map<int, int> prev;
-  map<int, vector<int>> children;
-  map<int, vector<int>> index_in_path;
-  map<int, Frontier> frontiers;
+  unordered_map<int, int> prev;
+  unordered_map<int, vector<int>> children;
+  unordered_map<int, vector<int>> &index_in_path;
+  unordered_map<int, Frontier> frontiers;
 
   int best_improvement;
   int best_ancestor;
   pair<int, int> best_left, best_right;
 
-  bool expand(int root, vector<int> &path, Graph &extra) {
-    assert(!path.empty());
+  Expander(unordered_map<int, vector<int>> &index_in_path) : index_in_path(index_in_path) {}
+
+  static unordered_map<int, vector<int>> compute_index_in_path(const vector<int> &path) {
+    unordered_map<int, vector<int>> index_in_path;
+    {TimeIt t("init index in path");
     for (int i = 0; i < path.size(); i++)
       index_in_path[path[i]].push_back(i);
+    }
+    return index_in_path;
+  }
+
+  bool expand(int root, vector<int> &path, Graph &extra) {
+    assert(!path.empty());
 
     //cerr << "index in path " << index_in_path << endl;
 
@@ -609,6 +618,8 @@ public:
         }
       }
     }
+    // if (prev.size() > 10)
+    //   cerr << prev.size() << endl;
 
     // TODO: remove
     /*Graph tree;
@@ -670,6 +681,9 @@ public:
       slice_assign(path, left_index, right_index, new_slice);
 
       //cerr << path << endl;
+
+      index_in_path = compute_index_in_path(path);
+
       return true;
     }
     return false;
@@ -740,6 +754,71 @@ public:
 };
 
 
+bool expand_cycle(int start_index, vector<int> &path, Graph &extra) {
+  TimeIt t("expand_cycle");
+  int start = path[start_index];
+  if(extra.count(start) == 0 or extra.at(start).size() < 2) {
+    return false;
+  }
+
+  bool first = true;
+  for (int next : extra.at(start)) {
+    if (first) {
+      // No need to try all edges, because cycle will use two.
+      first = false; continue;
+    }
+
+    //cerr << "Trying edge " << start << " " << next << endl;
+
+    remove_edge(extra, {start, next});
+
+    unordered_map<int, int> prev;
+    queue<int> work;
+
+    prev[next] = next;
+    work.push(next);
+
+    while (!work.empty()) {
+      add_work(1e-7);
+      int v = work.front();
+      //cerr << "work " << v << endl;
+      work.pop();
+
+      for (int w : extra.at(v)) {
+        if (prev.count(w) > 0) {
+          continue;
+        }
+        work.push(w);
+        prev[w] = v;
+
+        if (w == start) {
+          //cerr << "found cycle" << endl;
+          vector<int> cycle;
+
+          while (true) {
+            cycle.push_back(w);
+            if (w == prev[w]) break;
+            w = prev[w];
+          }
+          //cerr << cycle << endl;
+          for (int i = 1; i < cycle.size(); i++) {
+            remove_edge(extra, {cycle[i - 1], cycle[i]});
+          }
+          path.insert(path.begin() + start_index, cycle.begin(), cycle.end());
+          //cerr << "new path: " << path << endl;
+
+          return true;
+        }
+      }
+    }
+
+    add_edge(extra, {start, next});
+  }
+
+  return false;
+}
+
+
 vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
   TimeIt t("longest_path_by_expansion");
   auto path = ShortestPaths(g, from).get_path(to);
@@ -753,6 +832,10 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
   // TODO: support randomized changes even if new slice has the same length
   // as the old one.
 
+  //expand_cycle(0, path, extra);
+
+  auto index_in_path = Expander::compute_index_in_path(path);
+
   int seed = 42;
   while (true) {
     vector<int> roots;
@@ -764,8 +847,19 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
     shuffle(roots.begin(), roots.end(), std::default_random_engine(seed++));
 
     bool had_improvement = false;
+    //cerr << "-----------" << endl;
     for (int root : roots) {
-      if (Expander().expand(root, path, extra)) {
+
+      // It makes sense for very short paths.
+      if (expand_cycle(rand() % path.size(), path, extra)) {
+        assert(is_path_in_graph(g, from, to, path));
+        index_in_path = Expander::compute_index_in_path(path);
+        had_improvement = true;
+      }
+
+      // int old_size = path.size();
+      if (Expander(index_in_path).expand(root, path, extra)) {
+        //cerr << "delta " << (path.size() - old_size) << endl;
         // cerr << "improved" << endl;
         // cerr << "path: " << path << endl;
         // cerr << path_to_string(60, path) << endl;
@@ -775,13 +869,25 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
       if (check_deadline())
         break;
     }
+    bool need_recompute_index_in_path = false;
+    for (int i = 0; i < path.size(); i++) {
+      if (expand_cycle(i, path, extra)) {
+        assert(is_path_in_graph(g, from, to, path));
+        need_recompute_index_in_path = true;
+        had_improvement = true;
+      }
+    }
+    if (need_recompute_index_in_path) {
+      index_in_path = Expander::compute_index_in_path(path);
+    }
     if (!had_improvement)  {
       break;
     }
+
   }
 
-  // cerr << "Remains:" << endl;
-  // cerr << graph_to_string(60, extra) << endl;
+  //cerr << "Remains:" << endl;
+  //cerr << graph_to_string(60, extra) << endl;
 
   assert(is_path_in_graph(g, from, to , path));
   return path;

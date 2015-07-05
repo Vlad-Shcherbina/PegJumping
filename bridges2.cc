@@ -7,7 +7,7 @@
 
 
 int main() {
-  int n = 100;
+  int n = 60;
   Board board;
   for (int i = 0; i < n * n; i++) {
     board.push_back(EMPTY);
@@ -64,16 +64,24 @@ int main() {
 */
 
   vector<int> path;
-  { TimeIt t("longest_expansion_raw");
+  /*{ TimeIt t("longest_expansion_raw");
   path = longest_path_by_expansion_raw(largest, v, v + 2*n);
-  }
+  }*/
 
-  { TimeIt t("longest_expansion");
-  path = longest_path_by_expansion(largest, v, v + 2*n);
-  }
+  path = longest_path_by_expansion(largest, v, v + 0*n);
 
   cerr << path.size() << " " << path << endl;
   cerr << path_to_string(n, path) << endl;
+
+
+
+  Graph extra(largest);
+  assert(!path.empty());
+  for (int i = 1; i < path.size(); i++)
+    remove_edge(extra, {path[i - 1], path[i]});
+
+  cerr << "remainds: " << endl;
+  cerr << graph_to_string(n, extra) << endl;
 
 
 
