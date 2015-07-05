@@ -67,6 +67,7 @@ vector<Move> pick_long_path(const Board &board, int i_parity, int j_parity) {
 
 
 vector<Move> pick_long_path(const Board &board) {
+  add_work(1e-6 * pow(board_size(board), 3));
   vector<Move> best_path;
   int best_score = -1;
   for (int i_parity = 0; i_parity < 2; i_parity++)
@@ -185,6 +186,9 @@ public:
         move.apply(board);
       }
       i++;
+
+      if (check_deadline())
+        break;
     }
 
     cerr << path_scores << endl;
@@ -206,7 +210,7 @@ public:
 
     assert(deadlines.size() == 1);
     cerr << "# total_time_for_realz = " << (get_time() - start_time) << endl;
-    cerr << "get_time_counter = " << get_time_counter << endl;
+    cerr << "# get_time_counter = " << get_time_counter << endl;
 
     #ifndef SUBMISSION
     // Just in case, because there were some mysterious problems.
