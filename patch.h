@@ -170,15 +170,17 @@ public:
 };
 
 
-vector<Move> divide_and_optimize(Board board, int tile_size) {
+vector<Move> divide_and_optimize(Board board, int tile_size, int preferred_parity) {
   assert(tile_size % 2 == 0);
   int n = board_size(board);
 
   vector<Patcher> patchers;
   vector<Move> moves;
 
-  for (int i = 0; i + tile_size <= n; i += tile_size)  // +2 is a hack to ensure X
+  for (int i = preferred_parity; i + tile_size <= n; i += tile_size)  // +2 is a hack to ensure X
     for (int j = 0; j + tile_size <= n; j += tile_size) {
+      if (check_deadline())
+        break;
       patchers.emplace_back(board, i, j, tile_size);
       cerr << "tile at " << i << ", " << j << " of size " << tile_size << endl;
       cerr << "before:" << endl;
@@ -187,6 +189,8 @@ vector<Move> divide_and_optimize(Board board, int tile_size) {
       cerr << show_edges(patch, 0, 0) << endl;
 
       PatchOptimizer po(patch, 500000);
+      add_work(0.1);
+
       {
         TimeIt t("optimizing_patch");
         po.rec();

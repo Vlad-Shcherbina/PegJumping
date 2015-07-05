@@ -4,6 +4,7 @@
 #include "common.h"
 #include "sparsify.h"
 #include "bridges.h"
+#include "patch.h"
 
 
 const float TIME_LIMIT = 9.0;
@@ -168,6 +169,16 @@ public:
     cerr << board_to_string(board) << endl;
 
     cerr << show_edges(board, 0, preferred_parity) << endl;
+
+    add_subdeadline(0.2);
+    for (auto move : divide_and_optimize(board, 8, preferred_parity)) {
+      final_moves.push_back(move);
+      move.apply(board);
+    }
+    deadlines.pop_back();
+
+    cerr << show_edges(board, 0, preferred_parity) << endl;
+
 
     vector<int> path_scores;
     int i = 0;
