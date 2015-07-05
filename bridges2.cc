@@ -1,114 +1,255 @@
 //#define NDEBUG
 
+#define USE_TIME_IT
+
 #include "common.h"
 #include "bridges.h"
 
 
+typedef vector<pair<int, int>> Frontier;
 
-void expand_euler_graph(Graph &eg, Graph &extra) {
-  // make copy because we are mutating eg
-  for (const auto &kv : Graph(eg)) {
-    int start = kv.first;
 
-    auto p = extra.find(start);
-    if (p == extra.end() || p->second.empty())
-      continue;
-
-    ShortestPaths sp_orig(eg, start);
-
-    for (int w : p->second) {
-      cerr << "Considering departure " << start << " -> " << w << endl;
-
-      remove_edge(extra, {start, w});
-      ShortestPaths sp_extra(extra, w);
-
-      bool improved = false;
-      for (const auto &kv : sp_extra.distance) {
-        int end = kv.first;
-        int extra_distance = kv.second;
-
-        int orig_distance = sp_orig.get_distance(end);
-        if (orig_distance == -1 or orig_distance >= extra_distance + 1)
-          continue;
-
-        vector<int> extra_path = sp_extra.get_path(end);
-        extra_path.insert(extra_path.begin(), start);
-
-        vector<int> orig_path = sp_orig.get_path(end);
-
-        assert(!orig_path.empty());
-        assert(!extra_path.empty());
-        assert(orig_path.front() == extra_path.front());
-        assert(orig_path.back() == extra_path.back());
-        cerr << "found improvement" << extra_path << orig_path << endl;
-        assert(extra_path.size() > orig_path.size());
-
-        add_edge(extra, {start, w});  // we will immediately remove it
-
-        for (int i = 1; i < orig_path.size(); i++) {
-          Edge e(orig_path[i - 1], orig_path[i]);
-          remove_edge(eg, e);
-          add_edge(extra, e);
-        }
-        for (int i = 1; i < extra_path.size(); i++) {
-          Edge e(extra_path[i - 1], extra_path[i]);
-          add_edge(eg, e);
-          remove_edge(extra, e);
-        }
-
-        improved = true;
-        break;
-      }
-
-      // sp_orig was ivalidated,
-      // p->second we are iterating on was mutated
-      if (improved)
-        break;
-
-      add_edge(extra, {start, w});
-    }
-  }
+void build_frontier(Frontier &f) {
+  sort(f.begin(), f.end());
+  auto p = unique(f.begin(), f.end());
+  f.erase(p, f.end());
+  // TODO: remove dominated stuff
 }
 
 
-// DOES NOT WORK BECAUSE EULER REPRESENTATION DOES NOT MAINTAIN CONNECTIVITY
-vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
-  auto path = ShortestPaths(g, from).get_path(to);
-  assert(!path.empty());
+class Expander {
+public:
+  map<int, int> prev;
+  map<int, vector<int>> children;
+  map<int, vector<int>> index_in_path;
+  map<int, Frontier> frontiers;
 
-  Graph eg;
+  int best_improvement;
+  int best_ancestor;
+  pair<int, int> best_left, best_right;
 
-  // needed in expand_euler_graph
-  eg[from] = {};
-  eg[to] = {};
+  bool expand(int root, vector<int> &path, Graph &extra) {
+    assert(!path.empty());
+    for (int i = 0; i < path.size(); i++)
+      index_in_path[path[i]].push_back(i);
 
-  Graph remainder = g;
-  for (int i = 1; i < path.size(); i++) {
-    Edge e(path[i - 1], path[i]);
-    add_edge(eg, e);
-    remove_edge(remainder, e);
+    //cerr << "index in path " << index_in_path << endl;
+
+    //int root = 3530;
+
+    children[root] = {};
+
+    prev[root] = root;
+
+    queue<int> work;
+    work.push(root);
+
+    while (!work.empty()) {
+      int v = work.front();
+      work.pop();
+      for (int w : extra.at(v)) {
+        if (prev.count(w) == 0) {
+          prev[w] = v;
+          work.push(w);
+
+          if (index_in_path.count(w) > 0) {
+            //cerr << "hz" << endl;
+            int u = w;
+            while (true) {
+              auto pq = children.insert({prev[u], vector<int>()});
+              //assert(pq.)
+              auto &cs = pq.first->second;
+              // cerr << " ----------------" << endl;
+              // cerr << children << endl;
+              // cerr << u << " " << prev[u] << " " << cs << endl;
+              if (find(cs.begin(), cs.end(), u) != cs.end())
+                break;
+              cs.push_back(u);
+              if (!pq.second)
+                break;
+              u = prev[u];
+            }
+          }
+        }
+      }
+    }
+
+    // TODO: remove
+    /*Graph tree;
+    for (auto kv : children)
+      for (int child : kv.second)
+        add_edge(tree, {kv.first, child});
+    cerr << "tree: " << endl;
+    cerr << graph_to_string(60, tree) << endl;*/
+
+    //cerr << children << endl;
+
+    best_improvement = 0;
+    //cerr << "children " << children << endl;
+    rec(root);
+    //cerr << frontiers << endl;
+
+    if (best_improvement > 0) {
+      if (best_left.first > best_right.first) {
+        swap(best_left, best_right);
+      }
+
+      auto left_path = reconstruct(best_ancestor, best_left.first, best_left.second);
+      auto right_path = reconstruct(best_ancestor, best_right.first, best_right.second);
+
+      assert(best_left.first < best_right.first);
+
+      /*cerr << "path before: " << path << endl;
+      cerr << "best_improvement " << best_improvement << endl;
+      cerr << best_ancestor << ", " << best_left << ", " << best_right << endl;
+      cerr << left_path << endl;
+      cerr << right_path << endl;*/
+
+      auto new_slice = left_path;
+      reverse(new_slice.begin(), new_slice.end());
+      assert(new_slice.back() == right_path.front());
+      copy(right_path.begin() + 1, right_path.end(), back_inserter(new_slice));
+
+      //cerr << new_slice << endl;
+      int left_index = best_left.first;
+      int right_index = best_right.first;
+
+
+      for (int i = left_index; i < right_index; i++) {
+        Edge e(path[i], path[i + 1]);
+        assert(!has_edge(extra, e));
+        add_edge(extra, e);
+      }
+      for (int i = 1; i < new_slice.size(); i++) {
+        Edge e(new_slice[i - 1], new_slice[i]);
+        assert(has_edge(extra, e));
+        remove_edge(extra, e);
+      }
+
+      assert(path[left_index] == new_slice.front());
+      assert(path[right_index] == new_slice.back());
+
+      new_slice.pop_back();
+      assert(new_slice.size() > right_index - left_index);
+      slice_assign(path, left_index, right_index, new_slice);
+
+      //cerr << path << endl;
+      return true;
+    }
+    return false;
   }
 
-  while (true) {
-    auto old_eg = eg;
-    auto old_remainder = remainder;
+  void rec(int v) {
+    //cerr << v << endl;
+    assert(frontiers.count(v) == 0);
+    Frontier f;
+    if (index_in_path.count(v) > 0) {
+      for (int i : index_in_path.at(v))
+        f.emplace_back(i, 0);
+    }
 
-    expand_euler_graph(eg, remainder);
-    if (eg == old_eg) {
-      assert(remainder == old_remainder);
+    if (children.count(v) > 0) {
+      for (int child : children.at(v)) {
+        rec(child);
+        const auto &cf = frontiers.at(child);
+
+        // TODO: faster
+        for (auto kv : cf) {
+          kv = {kv.first, kv.second + 1};
+
+          for (const auto &kv2 : f) {
+            assert(kv.first != kv2.first);
+            int improvement = kv.second + kv2.second - abs(kv.first - kv2.first);
+            if (improvement > best_improvement) {
+              best_improvement = improvement;
+              best_ancestor = v;
+              best_left = kv2;
+              best_right = kv;
+            }
+          }
+        }
+
+        for (const auto &kv : cf) {
+          f.emplace_back(kv.first, kv.second + 1);
+        }
+      }
+    }
+
+    frontiers[v] = f;
+  }
+
+  vector<int> reconstruct(int v, int index, int depth) {
+    vector<int> result;
+    while (depth > 0) {
+      bool found = false;
+      for (int child : children.at(v)) {
+        const auto &cf = frontiers.at(child);
+        if (find(cf.begin(), cf.end(), make_pair(index, depth - 1)) != cf.end()) {
+          result.push_back(v);
+          v = child;
+          depth--;
+          found = true;
+          break;
+        }
+      }
+      assert(found);
+    }
+    const auto &is = index_in_path.at(v);
+    assert(find(is.begin(), is.end(), index) != is.end());
+    result.push_back(v);
+    return result;
+  }
+
+};
+
+
+vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
+  TimeIt t("longest_path_by_expansion");
+  auto path = ShortestPaths(g, from).get_path(to);
+
+
+  Graph extra(g);
+  assert(!path.empty());
+  for (int i = 1; i < path.size(); i++)
+    remove_edge(extra, {path[i - 1], path[i]});
+
+  // TODO: support randomized changes even if new slice has the same length
+  // as the old one.
+
+  int seed = 42;
+  while (true) {
+    vector<int> roots;
+    for (const auto &kv : extra) {
+      if (!kv.second.empty()) {
+        roots.push_back(kv.first);
+      }
+    }
+    shuffle(roots.begin(), roots.end(), std::default_random_engine(seed++));
+
+    bool had_improvement = false;
+    for (int root : roots) {
+      if (Expander().expand(root, path, extra)) {
+        // cerr << "improved" << endl;
+        // cerr << "path: " << path << endl;
+        // cerr << path_to_string(60, path) << endl;
+        assert(is_path_in_graph(g, from, to, path));
+        had_improvement = true;
+      }
+    }
+    if (!had_improvement)  {
       break;
     }
 
-    cerr << "eg:" << endl;
-    cerr << graph_to_string(20, eg) << endl;
-    cerr << "remainder:" << endl;
-    cerr << graph_to_string(20, remainder) << endl;
-
-    //break;
+    add_work(1e-7*pow(roots.size(), 1.5));
+    if (check_deadline())
+      break;
   }
 
+  // cerr << "Remains:" << endl;
+  // cerr << graph_to_string(60, extra) << endl;
 
-  return euler_path(eg, from, to);
+  assert(is_path_in_graph(g, from, to , path));
+  return path;
 }
 
 
@@ -152,7 +293,12 @@ int main() {
   for (const auto &kv : largest)
     v = min(kv.first, v);
 
+  int w = -1;
+  for (const auto &kv : largest)
+    w = max(kv.first, w);
+
   cerr << "v = " << v << endl;
+  cerr << "w = " << w << endl;
 
   // auto path = longest_path_in_2_edge_connected(largest, v, v);
 /*  auto path = ShortestPaths(largest, v).get_path(v + 2 * n);
@@ -164,15 +310,24 @@ int main() {
   cerr << graph_to_string(n, eg) << endl;
 */
 
-  auto path = longest_path_by_expansion_raw(largest, v, v + 2*n);
-  cerr << path.size() << endl;
+  vector<int> path;
+  { TimeIt t("longest_expansion_raw");
+  path = longest_path_by_expansion_raw(largest, v, v + 2*n);
+  }
+
+  { TimeIt t("longest_expansion");
+  path = longest_path_by_expansion(largest, v, v + 2*n);
+  }
+
+  cerr << path.size() << " " << path << endl;
   cerr << path_to_string(n, path) << endl;
 
 
 
-  { TimeIt t("old_ways");
-  cerr << "compared to old " << longest_path_in_2_edge_connected(largest, v, v).size() << endl;
-  }
+  // { TimeIt t("old_ways");
+  // cerr << "compared to old " << longest_path_in_2_edge_connected(largest, v, v).size() << endl;
+  // }
+
   /*auto path = longest_path_by_expansion(largest, v, v);
 
   cerr << path.size() << endl;
