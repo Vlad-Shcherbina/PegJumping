@@ -521,17 +521,20 @@ vector<int> expand_path(Graph graph, vector<int> path) {
 vector<int> longest_path_by_expansion_raw(const Graph &g, int from, int to) {
   TimeIt t("longest_path_by_expansion_raw");
   auto path = ShortestPaths(g, from).get_path(to);
+  auto work = 1e-6 * pow(num_edges(g) + 1, 1.4);
 
   // TODO: support randomized changes even if new slice has the same length
   // as the old one.
   while (true) {
+    if (check_deadline())
+      break;
+
     //cerr << path.size() << endl;
+    add_work(work);
     auto new_path = expand_path(g, path);
     if (path == new_path) break;
     path = new_path;
 
-    if (check_deadline())
-      break;
   }
   assert(is_path_in_graph(g, from, to, path));
   return path;

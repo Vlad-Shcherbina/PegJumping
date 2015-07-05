@@ -31,7 +31,7 @@ vector<Move> pick_long_path(const Board &board, int i_parity, int j_parity) {
 
   for (int pos : poss) {
     if (pos % n % 2 == j_parity && pos / n % 2 == i_parity) {
-      if (best_score > 0 && clock() > deadlines.back()) {
+      if (best_score > 0 && check_deadline()) {
         cerr << "shit" << endl;
         break;
       }
@@ -90,7 +90,11 @@ public:
   int n;
 
   vector<string> getMoves(vector<int> peg_values, vector<string> board_) {
-    deadlines.push_back(clock() + TIME_LIMIT * CLOCKS_PER_SEC);
+    auto start_time = get_time();
+    set_deadline_from_now(TIME_LIMIT);
+
+    //benchmark_timers(cerr);
+
     srand(42);
     vector<Move> final_moves;
     { TimeIt time_it("total");
@@ -167,7 +171,7 @@ public:
     vector<int> path_scores;
     int i = 0;
     while (true) {
-      add_subdeadline(0.9);
+      add_subdeadline(0.8);
       auto long_path = pick_long_path(board);
       deadlines.pop_back();
 
@@ -195,11 +199,14 @@ public:
     }  // TimeIt
     print_timers(cerr);
 
-    assert(deadlines.size() == 1);
 
     #ifdef LP_CACHE
     cerr << "# lp_cache_size = " << cache.size() << endl;
     #endif
+
+    assert(deadlines.size() == 1);
+    cerr << "# total_time_for_realz = " << (get_time() - start_time) << endl;
+    cerr << "get_time_counter = " << get_time_counter << endl;
 
     #ifndef SUBMISSION
     // Just in case, because there were some mysterious problems.
