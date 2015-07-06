@@ -546,35 +546,44 @@ typedef vector<pair<int, int>> Frontier;
 
 class Expander {
 public:
+  vector<int> &path;
+  Graph &extra;
+
+  unordered_map<int, vector<int>> index_in_path;
+
   unordered_map<int, int> prev;
   unordered_map<int, vector<int>> children;
-  unordered_map<int, vector<int>> &index_in_path;
   unordered_map<int, Frontier> frontiers;
 
   int best_improvement;
   int best_ancestor;
   pair<int, int> best_left, best_right;
 
-  Expander(unordered_map<int, vector<int>> &index_in_path) : index_in_path(index_in_path) {}
-
-  static unordered_map<int, vector<int>> compute_index_in_path(const vector<int> &path) {
-    unordered_map<int, vector<int>> index_in_path;
-    {TimeIt t("init index in path");
-    for (int i = 0; i < path.size(); i++)
-      index_in_path[path[i]].push_back(i);
-    }
-    return index_in_path;
+  //Expander(unordered_map<int, vector<int>> &index_in_path) : index_in_path(index_in_path) {}
+  Expander(vector<int> &path, Graph &extra) : path(path), extra(extra) {
+    refresh();
   }
 
-  bool expand(int root, vector<int> &path, Graph &extra) {
+  // Has to be called when referenced path or extra were changed externally.
+  void refresh() {
+    TimeIt t("expander_refresh");
+    index_in_path.clear();
+    for (int i = 0; i < path.size(); i++) {
+      index_in_path[path[i]].push_back(i);
+    }
+  }
+
+  bool expand(int root) {
     assert(!path.empty());
 
     //cerr << "index in path " << index_in_path << endl;
 
     //int root = 3530;
 
+    children.clear();
     children[root] = {};
 
+    prev.clear();
     prev[root] = root;
 
     queue<int> work;
@@ -623,6 +632,7 @@ public:
 
     //cerr << children << endl;
 
+    frontiers.clear();
     best_improvement = 0;
     //cerr << "children " << children << endl;
     rec(root);
@@ -674,7 +684,8 @@ public:
 
       //cerr << path << endl;
 
-      index_in_path = compute_index_in_path(path);
+      //index_in_path = compute_index_in_path(path);
+      refresh();
 
       return true;
     }
@@ -828,7 +839,8 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
 
   //expand_cycle(0, path, extra);
 
-  auto index_in_path = Expander::compute_index_in_path(path);
+  //auto index_in_path = Expander::compute_index_in_path(path);
+  Expander expander(path, extra);
 
   bool deadline_exceeded = false;
 
@@ -849,12 +861,13 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
       // It makes sense for very short paths.
       if (expand_cycle(rand() % path.size(), path, extra)) {
         assert(is_path_in_graph(g, from, to, path));
-        index_in_path = Expander::compute_index_in_path(path);
+        expander.refresh();
+        //index_in_path = Expander::compute_index_in_path(path);
         had_improvement = true;
       }
 
       // int old_size = path.size();
-      if (Expander(index_in_path).expand(root, path, extra)) {
+      if (expander.expand(root)) {
         //cerr << "delta " << (path.size() - old_size) << endl;
         // cerr << "improved" << endl;
         // cerr << "path: " << path << endl;
@@ -867,16 +880,16 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
         break;
       }
     }
-    bool need_recompute_index_in_path = false;
+    bool need_refresh = false;
     for (int i = 0; i < path.size(); i++) {
       if (expand_cycle(i, path, extra)) {
         assert(is_path_in_graph(g, from, to, path));
-        need_recompute_index_in_path = true;
+        need_refresh = true;
         had_improvement = true;
       }
     }
-    if (need_recompute_index_in_path) {
-      index_in_path = Expander::compute_index_in_path(path);
+    if (need_refresh) {
+      expander.refresh();
     }
     if (!had_improvement)  {
       break;
