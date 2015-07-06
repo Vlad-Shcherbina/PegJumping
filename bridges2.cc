@@ -7,7 +7,7 @@
 
 
 int main() {
-  int n = 60;
+  int n = 40;
   Board board;
   for (int i = 0; i < n * n; i++) {
     board.push_back(EMPTY);
@@ -84,6 +84,7 @@ int main() {
   cerr << graph_to_string(n, extra) << endl;
 
 
+  cerr << longest_path_stats << endl;
 
   // { TimeIt t("old_ways");
   // cerr << "compared to old " << longest_path_in_2_edge_connected(largest, v, v).size() << endl;

@@ -202,6 +202,8 @@ public:
         break;
     }
 
+    cerr << "# longest_path_stats = " << longest_path_stats << endl;
+
     cerr << path_scores << endl;
     if (path_scores.size() >= 2) {
       cerr << "# score_ratio = " << 1.0 * path_scores[1] / path_scores[0] << endl;

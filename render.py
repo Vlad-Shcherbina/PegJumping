@@ -85,7 +85,7 @@ def aggregate_stats(results):
             log(result['score']) if result['score'] else -100)
         stats.setdefault('seeds', []).append(result['seed'])
         for k, v in result.items():
-            if k in ('score', 'seed', 'time'):
+            if k in ('score', 'seed', 'time', 'longest_path_stats'):
                 continue
             stats[k].add_value(v)
     return stats

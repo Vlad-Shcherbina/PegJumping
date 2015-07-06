@@ -544,14 +544,6 @@ vector<int> longest_path_by_expansion_raw(const Graph &g, int from, int to) {
 typedef vector<pair<int, int>> Frontier;
 
 
-void build_frontier(Frontier &f) {
-  sort(f.begin(), f.end());
-  auto p = unique(f.begin(), f.end());
-  f.erase(p, f.end());
-  // TODO: remove dominated stuff
-}
-
-
 class Expander {
 public:
   unordered_map<int, int> prev;
@@ -819,6 +811,8 @@ bool expand_cycle(int start_index, vector<int> &path, Graph &extra) {
 }
 
 
+map<tuple<int, int, int, int>, int> longest_path_stats;
+
 vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
   TimeIt t("longest_path_by_expansion");
   auto path = ShortestPaths(g, from).get_path(to);
@@ -835,6 +829,8 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
   //expand_cycle(0, path, extra);
 
   auto index_in_path = Expander::compute_index_in_path(path);
+
+  bool deadline_exceeded = false;
 
   int seed = 42;
   while (true) {
@@ -866,8 +862,10 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
         assert(is_path_in_graph(g, from, to, path));
         had_improvement = true;
       }
-      if (check_deadline())
+      if (check_deadline()) {
+        deadline_exceeded = true;
         break;
+      }
     }
     bool need_recompute_index_in_path = false;
     for (int i = 0; i < path.size(); i++) {
@@ -889,7 +887,18 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
   //cerr << "Remains:" << endl;
   //cerr << graph_to_string(60, extra) << endl;
 
-  assert(is_path_in_graph(g, from, to , path));
+  if (!deadline_exceeded) {
+    int degrees[5] = {0};
+    for (const auto &kv : g) {
+      assert(kv.second.size() <= 4);
+      degrees[kv.second.size()]++;
+    }
+    assert(degrees[0] == 0);
+    assert(degrees[1] == 0);
+    longest_path_stats[make_tuple(degrees[2], degrees[3], degrees[4], path.size() - 1)]++;
+  }
+
+  assert(is_path_in_graph(g, from, to, path));
   return path;
 }
 
