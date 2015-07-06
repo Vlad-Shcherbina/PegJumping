@@ -47,6 +47,7 @@ void add_subdeadline(double fraction) {
   if (remaining < 0) {
     cerr << "# DEADLINE_MISSED = " << remaining << endl;
     deadlines.push_back(deadlines.back());
+    return;
   }
 
   deadlines.push_back(now + remaining * fraction);
