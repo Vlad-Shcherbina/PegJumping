@@ -462,62 +462,6 @@ vector<Edge> maximal_matching(const Graph &g) {
 }
 
 
-vector<int> expand_path(Graph graph, vector<int> path) {
-  assert(!path.empty());
-
-  map<int, int> index_in_path;
-  for (int i = 0; i < path.size(); i++) {
-    index_in_path[path[i]] = i;
-  }
-
-  for (int i = 1; i < path.size(); i++)
-    remove_edge(graph, {path[i - 1], path[i]});
-
-  for (const auto &kv : index_in_path) {
-    int start = kv.first;
-    // TODO: distringuish minimum and maximum index
-    int start_index = kv.second;
-
-    auto p = graph.find(start);
-    if (p == graph.end())
-      continue;
-
-    for (int w : p->second) {
-      // cerr << "Considering departure " << start << " -> " << w << endl;
-
-      remove_edge(graph, {start, w});
-
-      ShortestPaths sp(graph, w);
-      for (const auto &kv2 : index_in_path) {
-        int candidate_end = kv2.first;
-        int end_index = kv2.second;
-        int d = sp.get_distance(candidate_end);
-        if (d != -1 && d + 1 > abs(end_index - start_index)) {
-          vector<int> new_slice = sp.get_path(candidate_end);
-
-          // cerr << "Improvement found: " << new_slice << endl;
-
-          if (start_index <= end_index) {
-            slice_assign(path, start_index + 1, end_index + 1, new_slice);
-          } else {
-            reverse(new_slice.begin(), new_slice.end());
-            slice_assign(path, end_index, start_index, new_slice);
-          }
-
-          return path;
-        }
-      }
-
-      add_edge(graph, {start, w});
-    }
-  }
-
-  //cerr << graph_to_string(10, graph) << endl;
-
-  return path;
-}
-
-
 typedef vector<pair<int, int>> Frontier;
 
 
@@ -536,7 +480,6 @@ public:
   int best_ancestor;
   pair<int, int> best_left, best_right;
 
-  //Expander(unordered_map<int, vector<int>> &index_in_path) : index_in_path(index_in_path) {}
   Expander(vector<int> &path, Graph &extra) : path(path), extra(extra) {
     refresh();
   }
