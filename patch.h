@@ -65,7 +65,7 @@ public:
 
     int score = naive_score();
     if (score > best_score) {
-      cerr << "improvement: " << score << " at " << cnt << endl;
+      //cerr << "improvement: " << score << " at " << cnt << endl;
       best_score = score;
       best_moves = moves;
     }
@@ -171,43 +171,59 @@ public:
 
 
 vector<Move> divide_and_optimize(Board board, int tile_size, int preferred_parity) {
+  TimeIt t("divide_and_optimize");
   assert(tile_size % 2 == 0);
   int n = board_size(board);
 
-  vector<Patcher> patchers;
-  vector<Move> moves;
+  vector<Move> all_moves;
 
-  for (int i = preferred_parity; i + tile_size <= n; i += tile_size)  // +2 is a hack to ensure X
-    for (int j = 0; j + tile_size <= n; j += tile_size) {
-      if (check_deadline())
-        break;
-      patchers.emplace_back(board, i, j, tile_size);
-      cerr << "tile at " << i << ", " << j << " of size " << tile_size << endl;
-      cerr << "before:" << endl;
+  for (int q = 0; q < 2; q++) {
+    if (check_deadline())
+      break;
 
-      auto patch = patchers.back().get();
-      cerr << show_edges(patch, 0, 0) << endl;
+    vector<Patcher> patchers;
+    vector<Move> moves;
 
-      PatchOptimizer po(patch, 500000);
-      add_work(0.1);
+    int base_i = (rand() % tile_size) / 2 * 2;
+    int base_j = (rand() % tile_size) / 2 * 2;
+    for (int i = base_i + preferred_parity; i + tile_size <= n; i += tile_size) {
+      for (int j = base_j; j + tile_size <= n; j += tile_size) {
+        if (check_deadline())
+          break;
+        patchers.emplace_back(board, i, j, tile_size);
+        //cerr << "tile at " << i << ", " << j << " of size " << tile_size << endl;
+        //cerr << "before:" << endl;
 
-      {
-        TimeIt t("optimizing_patch");
-        po.rec();
+        auto patch = patchers.back().get();
+        //cerr << show_edges(patch, 0, 0) << endl;
+
+        PatchOptimizer po(patch, 500000);
+        add_work(0.1);
+
+        {
+          TimeIt t("optimizing_patch");
+          po.rec();
+        }
+        for (auto move : po.best_moves) {
+          move.apply(patch);
+          moves.push_back(patchers.back().translate_moves({move}).front());
+        }
+
+        //auto patch_moves = po(patch)
+
+        //cerr << "after:" << endl;
+        //cerr << show_edges(patch, 0, 0) << endl;
       }
-      for (auto move : po.best_moves) {
-        move.apply(patch);
-        moves.push_back(patchers.back().translate_moves({move}).front());
-      }
-
-      //auto patch_moves = po(patch)
-
-      cerr << "after:" << endl;
-      cerr << show_edges(patch, 0, 0) << endl;
     }
 
+    for (auto move : moves) {
+      move.apply(board);
+      all_moves.push_back(move);
+    }
+  }
+
   cerr << "whole board after: " << endl;
-  for (auto move : moves) move.apply(board);
   cerr << show_edges(board, preferred_parity, 0) << endl;
-  return moves;
+  cerr << endl;
+  return all_moves;
 }

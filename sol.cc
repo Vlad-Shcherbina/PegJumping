@@ -1,5 +1,9 @@
 #define NDEBUG
 
+#ifndef SUBMISSION
+#define USE_TIME_IT
+#endif
+
 #include <unistd.h>
 #include "common.h"
 #include "sparsify.h"
@@ -170,12 +174,14 @@ public:
 
     cerr << show_edges(board, 0, preferred_parity) << endl;
 
-    add_subdeadline(0.2);
+    add_subdeadline(0.1);
     for (auto move : divide_and_optimize(board, 8, preferred_parity)) {
       final_moves.push_back(move);
       move.apply(board);
     }
     deadlines.pop_back();
+    if (deadlines.size() != 1) cerr << "Deadlines: " << deadlines << endl;
+    assert(deadlines.size() == 1);
 
     cerr << show_edges(board, 0, preferred_parity) << endl;
 
@@ -184,6 +190,7 @@ public:
     int i = 0;
     while (true) {
       add_subdeadline(0.8);
+
       auto long_path = pick_long_path(board);
       deadlines.pop_back();
 
@@ -221,6 +228,7 @@ public:
     cerr << "# lp_cache_size = " << cache.size() << endl;
     #endif
 
+    if (deadlines.size() != 1) cerr << "Deadlines: " << deadlines << endl;
     assert(deadlines.size() == 1);
     cerr << "# total_time_for_realz = " << (get_time() - start_time) << endl;
     cerr << "# get_time_counter = " << get_time_counter << endl;
