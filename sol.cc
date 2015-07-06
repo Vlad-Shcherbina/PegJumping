@@ -47,7 +47,7 @@ vector<Move> pick_long_path(const Board &board, int i_parity, int j_parity) {
         for (auto e : es)
           add_edge(g, e);
 
-        vector<int> path = longest_path_from(g, pos);
+        vector<int> path = longest_path_from(g, pos, board);
         int score = path_score(board, path);
         if (score > best_score) {
           best = path;

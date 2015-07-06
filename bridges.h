@@ -469,8 +469,10 @@ class Expander {
 public:
   vector<int> &path;
   Graph &extra;
+  function<int(int, int)> color_func;
 
-  unordered_map<int, vector<int>> index_in_path;
+  unordered_map<int, int> index_by_inc_score;
+  unordered_map<int, vector<int>> inc_score_in_path;
 
   unordered_map<int, int> prev;
   unordered_map<int, vector<int>> children;
@@ -480,16 +482,31 @@ public:
   int best_ancestor;
   pair<int, int> best_left, best_right;
 
-  Expander(vector<int> &path, Graph &extra) : path(path), extra(extra) {
+  Expander(vector<int> &path, Graph &extra, function<int(int, int)> color_func)
+      : path(path), extra(extra), color_func(color_func) {
     refresh();
   }
 
   // Has to be called when referenced path or extra were changed externally.
   void refresh() {
     TimeIt t("expander_refresh");
-    index_in_path.clear();
+
+    inc_score_in_path.clear();
+    index_by_inc_score.clear();
+
+    //index_in_path.clear();
+
+    int inc_score = 0;
     for (int i = 0; i < path.size(); i++) {
-      index_in_path[path[i]].push_back(i);
+      inc_score_in_path[path[i]].push_back(inc_score);
+
+      assert(index_by_inc_score.count(inc_score) == 0);
+      index_by_inc_score[inc_score] = i;
+
+      if (i + 1 < path.size()) {
+        inc_score += color_func(path[i], path[i + 1]);
+      }
+      //index_in_path[path[i]].push_back(i);
     }
   }
 
@@ -514,7 +531,7 @@ public:
           prev[w] = v;
           work.push(w);
 
-          if (index_in_path.count(w) > 0) {
+          if (inc_score_in_path.count(w) > 0) {
             int u = w;
             while (true) {
               auto pq = children.insert({prev[u], vector<int>()});
@@ -550,8 +567,8 @@ public:
       assert(new_slice.back() == right_path.front());
       copy(right_path.begin() + 1, right_path.end(), back_inserter(new_slice));
 
-      int left_index = best_left.first;
-      int right_index = best_right.first;
+      int left_index = index_by_inc_score.at(best_left.first);
+      int right_index = index_by_inc_score.at(best_right.first);
 
       for (int i = left_index; i < right_index; i++) {
         Edge e(path[i], path[i + 1]);
@@ -568,7 +585,11 @@ public:
       assert(path[right_index] == new_slice.back());
 
       new_slice.pop_back();
-      assert(new_slice.size() > right_index - left_index);
+
+      // Not necessarily true because the goal is to increase score instead of
+      // length.
+      //assert(new_slice.size() > right_index - left_index);
+
       slice_assign(path, left_index, right_index, new_slice);
 
       refresh();
@@ -581,19 +602,21 @@ public:
   void rec(int v) {
     assert(frontiers.count(v) == 0);
     Frontier f;
-    if (index_in_path.count(v) > 0) {
-      for (int i : index_in_path.at(v))
+    if (inc_score_in_path.count(v) > 0) {
+      for (int i : inc_score_in_path.at(v))
         f.emplace_back(i, 0);
     }
 
     if (children.count(v) > 0) {
       for (int child : children.at(v)) {
+        int edge_score = color_func(child, v);
+
         rec(child);
         const auto &cf = frontiers.at(child);
 
         // TODO: faster
         for (auto kv : cf) {
-          kv = {kv.first, kv.second + 1};
+          kv = {kv.first, kv.second + edge_score};
 
           for (const auto &kv2 : f) {
             assert(kv.first != kv2.first);
@@ -608,7 +631,7 @@ public:
         }
 
         for (const auto &kv : cf) {
-          f.emplace_back(kv.first, kv.second + 1);
+          f.emplace_back(kv.first, kv.second + edge_score);
         }
       }
     }
@@ -617,24 +640,25 @@ public:
     frontiers[v] = f;
   }
 
-  vector<int> reconstruct(int v, int index, int depth) {
+  vector<int> reconstruct(int v, int inc_score, int depth) {
     vector<int> result;
     while (depth > 0) {
       bool found = false;
       for (int child : children.at(v)) {
+        int edge_score = color_func(child, v);
         const auto &cf = frontiers.at(child);
-        if (find(cf.begin(), cf.end(), make_pair(index, depth - 1)) != cf.end()) {
+        if (find(cf.begin(), cf.end(), make_pair(inc_score, depth - edge_score)) != cf.end()) {
           result.push_back(v);
           v = child;
-          depth--;
+          depth -= edge_score;
           found = true;
           break;
         }
       }
       assert(found);
     }
-    const auto &is = index_in_path.at(v);
-    assert(find(is.begin(), is.end(), index) != is.end());
+    const auto &is = inc_score_in_path.at(v);
+    assert(find(is.begin(), is.end(), inc_score) != is.end());
     result.push_back(v);
     return result;
   }
@@ -703,7 +727,7 @@ bool expand_cycle(int start_index, vector<int> &path, Graph &extra) {
 
 map<tuple<int, int, int, int>, int> longest_path_stats;
 
-vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
+vector<int> longest_path_by_expansion(const Graph &g, int from, int to, const Board &board) {
   TimeIt t("longest_path_by_expansion");
   auto path = ShortestPaths(g, from).get_path(to);
 
@@ -716,7 +740,12 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
   // TODO: support randomized changes even if new slice has the same length
   // as the old one.
 
-  Expander expander(path, extra);
+  Expander expander(path, extra, [&board](int a, int b) {
+    assert(a != b);
+    assert((a + b) % 2 == 0);
+    assert(board[(a + b) / 2] != EMPTY);
+    return 100 + board[(a + b) / 2];
+  });
 
   bool deadline_exceeded = false;
 
@@ -800,10 +829,10 @@ map<CacheKey, vector<int>> cache;
 #endif
 
 
-vector<int> longest_path(const Graph &g, int from, int to);
+//vector<int> longest_path(const Graph &g, int from, int to);
 
 
-vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
+vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to, const Board &board) {
   //cout << "lpi2ec " << g << " " << from << " " << to << endl;
   if (g.empty()) {
     if (from == to)
@@ -843,7 +872,7 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
   }
   #endif
 
-  auto result = longest_path_by_expansion(g, from, to);
+  auto result = longest_path_by_expansion(g, from, to, board);
 
   #ifdef LP_CACHE
   return cache[cache_key] = result;
@@ -930,7 +959,7 @@ vector<int> longest_path_in_2_edge_connected(const Graph &g, int from, int to) {
 }
 
 
-vector<int> longest_path_in_bridge_forest(const BridgeForest &bf, int from, int to) {
+vector<int> longest_path_in_bridge_forest(const BridgeForest &bf, int from, int to, const Board &board) {
   //assert(bf.block_by_vertex.count(from) > 0);
   if (bf.block_by_vertex.count(to) == 0)
     return {};
@@ -949,14 +978,14 @@ vector<int> longest_path_in_bridge_forest(const BridgeForest &bf, int from, int 
     assert(bf.parent_block[i] != SENTINEL);
     assert(bf.block_by_vertex.at(e.first) == bf.parent_block[i]);
 
-    auto hz = longest_path_in_2_edge_connected(bf.bridge_blocks[i], e.second, v);
+    auto hz = longest_path_in_2_edge_connected(bf.bridge_blocks[i], e.second, v, board);
     assert(!hz.empty());
     fragments.push_back(hz);
     fragments.push_back({e.first, e.second});
     v = e.first;
   }
 
-  auto hz = longest_path_in_2_edge_connected(bf.bridge_blocks[start_block], from, v);
+  auto hz = longest_path_in_2_edge_connected(bf.bridge_blocks[start_block], from, v, board);
   assert(!hz.empty());
   fragments.push_back(hz);
 
@@ -968,9 +997,9 @@ vector<int> longest_path_in_bridge_forest(const BridgeForest &bf, int from, int 
 }
 
 
-vector<int> longest_path(const Graph &g, int from, int to) {
+vector<int> longest_path(const Graph &g, int from, int to, const Board &board) {
   BridgeForest bf(g, from);
-  vector<int> result = longest_path_in_bridge_forest(bf, from, to);
+  vector<int> result = longest_path_in_bridge_forest(bf, from, to, board);
   if (!result.empty()) {
     // cerr << g << endl;
     // cerr << from << " ... "<< to << endl;
@@ -981,7 +1010,7 @@ vector<int> longest_path(const Graph &g, int from, int to) {
 }
 
 
-vector<int> longest_path_from(const Graph &g, int from) {
+vector<int> longest_path_from(const Graph &g, int from, const Board &board) {
   BridgeForest bf(g, from);
   assert(bf.roots == vector<int>{0});
   assert(bf.block_entry_point(0) == from);
@@ -1006,15 +1035,16 @@ vector<int> longest_path_from(const Graph &g, int from) {
       Edge e = bf.bridge_edges[child];
       tried_endpoints.insert(e.first);
 
+      /*
       int ub = upper_bound_on_longest_path_in_2_edge_connected(block, bf.block_entry_point(i), e.first);
       if (ub + 1 + best_path[child].size() <= best_path[i].size()) {
         // cerr << "ub cut " << block.size() << block << endl;
         // cerr << "by " << (best_path[i].size() - (ub + 1 + best_path[child].size())) << endl;
         continue;
-      }
+      }*/
 
       vector<int> path = longest_path_in_2_edge_connected(
-        block, bf.block_entry_point(i), e.first);
+        block, bf.block_entry_point(i), e.first, board);
       extend_path(path, {e.first, e.second});
       extend_path(path, best_path[child]);
 
@@ -1032,7 +1062,7 @@ vector<int> longest_path_from(const Graph &g, int from) {
         if (--limit == 0) break;
 
         vector<int> path = longest_path_in_2_edge_connected(
-            block, bf.block_entry_point(i), v);
+            block, bf.block_entry_point(i), v, board);
         if (path.size() > best_path[i].size()) {
           assert(path.front() == best_path[i].front());
           best_path[i] = path;

@@ -13,7 +13,7 @@ int main() {
     board.push_back(EMPTY);
     int p = (i % n + i / n) % 2 == 1 ? 750 : 150;
     if (rand() % 1000 < p)
-      board.back() = 1;
+      board.back() = 1 + rand() % 9;
   }
 
   cerr << board_to_string(board) << endl;
@@ -55,10 +55,11 @@ int main() {
 
   vector<int> path;
 
-  path = longest_path_by_expansion(largest, v, v + 0*n);
+  path = longest_path_by_expansion(largest, v, v + 0*n, board);
 
   cerr << path.size() << " " << path << endl;
   cerr << path_to_string(n, path) << endl;
+  cerr << "path score: " << path_score(board, path) << endl;
 
 
 
@@ -67,8 +68,9 @@ int main() {
   for (int i = 1; i < path.size(); i++)
     remove_edge(extra, {path[i - 1], path[i]});
 
-  cerr << "remainds: " << endl;
+  cerr << "remains: " << endl;
   cerr << graph_to_string(n, extra) << endl;
+
 
 
   cerr << longest_path_stats << endl;
