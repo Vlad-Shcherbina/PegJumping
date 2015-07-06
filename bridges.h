@@ -518,29 +518,6 @@ vector<int> expand_path(Graph graph, vector<int> path) {
 }
 
 
-vector<int> longest_path_by_expansion_raw(const Graph &g, int from, int to) {
-  TimeIt t("longest_path_by_expansion_raw");
-  auto path = ShortestPaths(g, from).get_path(to);
-  auto work = 1e-6 * pow(num_edges(g) + 1, 1.4);
-
-  // TODO: support randomized changes even if new slice has the same length
-  // as the old one.
-  while (true) {
-    if (check_deadline())
-      break;
-
-    //cerr << path.size() << endl;
-    add_work(work);
-    auto new_path = expand_path(g, path);
-    if (path == new_path) break;
-    path = new_path;
-
-  }
-  assert(is_path_in_graph(g, from, to, path));
-  return path;
-}
-
-
 typedef vector<pair<int, int>> Frontier;
 
 
@@ -576,10 +553,6 @@ public:
   bool expand(int root) {
     assert(!path.empty());
 
-    //cerr << "index in path " << index_in_path << endl;
-
-    //int root = 3530;
-
     children.clear();
     children[root] = {};
 
@@ -599,15 +572,10 @@ public:
           work.push(w);
 
           if (index_in_path.count(w) > 0) {
-            //cerr << "hz" << endl;
             int u = w;
             while (true) {
               auto pq = children.insert({prev[u], vector<int>()});
-              //assert(pq.)
               auto &cs = pq.first->second;
-              // cerr << " ----------------" << endl;
-              // cerr << children << endl;
-              // cerr << u << " " << prev[u] << " " << cs << endl;
               if (find(cs.begin(), cs.end(), u) != cs.end())
                 break;
               cs.push_back(u);
@@ -619,24 +587,10 @@ public:
         }
       }
     }
-    // if (prev.size() > 10)
-    //   cerr << prev.size() << endl;
-
-    // TODO: remove
-    /*Graph tree;
-    for (auto kv : children)
-      for (int child : kv.second)
-        add_edge(tree, {kv.first, child});
-    cerr << "tree: " << endl;
-    cerr << graph_to_string(60, tree) << endl;*/
-
-    //cerr << children << endl;
 
     frontiers.clear();
     best_improvement = 0;
-    //cerr << "children " << children << endl;
     rec(root);
-    //cerr << frontiers << endl;
 
     if (best_improvement > 0) {
       if (best_left.first > best_right.first) {
@@ -648,21 +602,13 @@ public:
 
       assert(best_left.first < best_right.first);
 
-      /*cerr << "path before: " << path << endl;
-      cerr << "best_improvement " << best_improvement << endl;
-      cerr << best_ancestor << ", " << best_left << ", " << best_right << endl;
-      cerr << left_path << endl;
-      cerr << right_path << endl;*/
-
       auto new_slice = left_path;
       reverse(new_slice.begin(), new_slice.end());
       assert(new_slice.back() == right_path.front());
       copy(right_path.begin() + 1, right_path.end(), back_inserter(new_slice));
 
-      //cerr << new_slice << endl;
       int left_index = best_left.first;
       int right_index = best_right.first;
-
 
       for (int i = left_index; i < right_index; i++) {
         Edge e(path[i], path[i + 1]);
@@ -682,9 +628,6 @@ public:
       assert(new_slice.size() > right_index - left_index);
       slice_assign(path, left_index, right_index, new_slice);
 
-      //cerr << path << endl;
-
-      //index_in_path = compute_index_in_path(path);
       refresh();
 
       return true;
@@ -693,7 +636,6 @@ public:
   }
 
   void rec(int v) {
-    //cerr << v << endl;
     assert(frontiers.count(v) == 0);
     Frontier f;
     if (index_in_path.count(v) > 0) {
@@ -771,8 +713,6 @@ bool expand_cycle(int start_index, vector<int> &path, Graph &extra) {
       first = false; continue;
     }
 
-    //cerr << "Trying edge " << start << " " << next << endl;
-
     remove_edge(extra, {start, next});
 
     unordered_map<int, int> prev;
@@ -784,7 +724,6 @@ bool expand_cycle(int start_index, vector<int> &path, Graph &extra) {
     while (!work.empty()) {
       add_work(1e-7);
       int v = work.front();
-      //cerr << "work " << v << endl;
       work.pop();
 
       for (int w : extra.at(v)) {
@@ -795,7 +734,6 @@ bool expand_cycle(int start_index, vector<int> &path, Graph &extra) {
         prev[w] = v;
 
         if (w == start) {
-          //cerr << "found cycle" << endl;
           vector<int> cycle;
 
           while (true) {
@@ -803,12 +741,10 @@ bool expand_cycle(int start_index, vector<int> &path, Graph &extra) {
             if (w == prev[w]) break;
             w = prev[w];
           }
-          //cerr << cycle << endl;
           for (int i = 1; i < cycle.size(); i++) {
             remove_edge(extra, {cycle[i - 1], cycle[i]});
           }
           path.insert(path.begin() + start_index, cycle.begin(), cycle.end());
-          //cerr << "new path: " << path << endl;
 
           return true;
         }
@@ -837,9 +773,6 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
   // TODO: support randomized changes even if new slice has the same length
   // as the old one.
 
-  //expand_cycle(0, path, extra);
-
-  //auto index_in_path = Expander::compute_index_in_path(path);
   Expander expander(path, extra);
 
   bool deadline_exceeded = false;
@@ -855,23 +788,16 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
     shuffle(roots.begin(), roots.end(), std::default_random_engine(seed++));
 
     bool had_improvement = false;
-    //cerr << "-----------" << endl;
     for (int root : roots) {
 
       // It makes sense for very short paths.
       if (expand_cycle(rand() % path.size(), path, extra)) {
         assert(is_path_in_graph(g, from, to, path));
         expander.refresh();
-        //index_in_path = Expander::compute_index_in_path(path);
         had_improvement = true;
       }
 
-      // int old_size = path.size();
       if (expander.expand(root)) {
-        //cerr << "delta " << (path.size() - old_size) << endl;
-        // cerr << "improved" << endl;
-        // cerr << "path: " << path << endl;
-        // cerr << path_to_string(60, path) << endl;
         assert(is_path_in_graph(g, from, to, path));
         had_improvement = true;
       }
@@ -896,9 +822,6 @@ vector<int> longest_path_by_expansion(const Graph &g, int from, int to) {
     }
 
   }
-
-  //cerr << "Remains:" << endl;
-  //cerr << graph_to_string(60, extra) << endl;
 
   if (!deadline_exceeded) {
     int degrees[5] = {0};

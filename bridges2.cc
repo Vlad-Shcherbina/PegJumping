@@ -53,20 +53,7 @@ int main() {
   cerr << "v = " << v << endl;
   cerr << "w = " << w << endl;
 
-  // auto path = longest_path_in_2_edge_connected(largest, v, v);
-/*  auto path = ShortestPaths(largest, v).get_path(v + 2 * n);
-  cerr << path << endl;
-  Graph eg;
-  for (int i = 1; i < path.size(); i++)
-    add_edge(eg, {path[i - 1], path[i]});
-
-  cerr << graph_to_string(n, eg) << endl;
-*/
-
   vector<int> path;
-  /*{ TimeIt t("longest_expansion_raw");
-  path = longest_path_by_expansion_raw(largest, v, v + 2*n);
-  }*/
 
   path = longest_path_by_expansion(largest, v, v + 0*n);
 
@@ -85,16 +72,6 @@ int main() {
 
 
   cerr << longest_path_stats << endl;
-
-  // { TimeIt t("old_ways");
-  // cerr << "compared to old " << longest_path_in_2_edge_connected(largest, v, v).size() << endl;
-  // }
-
-  /*auto path = longest_path_by_expansion(largest, v, v);
-
-  cerr << path.size() << endl;
-  cerr << path_to_string(n, path) << endl;
-  */
 
   print_timers(cerr);
 }
